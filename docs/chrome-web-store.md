@@ -1,0 +1,177 @@
+# Releasing to the Chrome Web Store
+
+How to publish Lekseis Hover and ship updates. The Web Store dashboard changes
+from time to time. If a field here doesn't match what you see, trust the
+dashboard and update this page.
+
+## Before the first release
+
+### 1. Register as a Chrome Web Store developer (once)
+
+1. Go to the [Developer Dashboard](https://chrome.google.com/webstore/devconsole)
+   and sign in with the Google account that will own the extension.
+2. Accept the developer agreement and pay the one-time registration fee.
+3. Turn on **2-Step Verification** for the account. Publishing requires it.
+4. Under **Account**, set the **contact email** and verify it. It's shown
+   publicly on the listing, and the privacy policy points users to it.
+
+### 2. Put the privacy policy at a public URL
+
+The store needs a privacy policy URL, because the extension sends looked-up text
+to kaikki.org and MyMemory. The policy is [PRIVACY.md](../PRIVACY.md), but
+**this repository is private**, so its GitHub link won't work for reviewers.
+Do one of the following:
+
+- Make the repository public. The URL is then
+  `https://github.com/joshuadiablito/lekseis-hover/blob/main/PRIVACY.md`.
+- Or publish the contents of `PRIVACY.md` somewhere public, such as a public
+  gist or your own site, and use that URL.
+
+Update the "Last updated" date in `PRIVACY.md` whenever what the extension
+sends or stores changes. Update the store's privacy answers (below) at the same
+time.
+
+### 3. Prepare the listing images
+
+| Asset              | Size                   | Source                                                          |
+| ------------------ | ---------------------- | --------------------------------------------------------------- |
+| Store icon         | 128 × 128 PNG          | `public/icons/icon-128.png`                                     |
+| Screenshots (1–5)  | 1280 × 800 PNG or JPEG | `bun run build && bun run smoke` writes them to `smoke-output/` |
+| Small promo tile   | 440 × 280 PNG or JPEG  | Not made yet; the dashboard shows whether it's required         |
+
+The smoke test's screenshots of the French verb, adjective, Greek and Spanish
+lookups are the right size. They show the test page, so for a nicer listing,
+take screenshots on a real site at the same size.
+
+## Releasing a version
+
+### 1. Set the version
+
+The version must be higher than the last one uploaded; the store rejects
+repeats. Change it in **both** files, which must match:
+
+- `package.json` → `"version"`
+- `public/manifest.json` → `"version"`
+
+Use `major.minor.patch`, e.g. `0.1.0` → `0.2.0` for new features, → `0.1.1` for fixes.
+
+### 2. Test
+
+```sh
+bun run build && bun run smoke
+```
+
+Then load `dist/` unpacked (see the README) and check by hand:
+
+- hover over words on a real site in each language you changed;
+- the keyboard shortcut and Escape;
+- the settings page and toolbar popup;
+- a site in a language you're *not* learning, where nothing should happen.
+
+### 3. Package
+
+```sh
+bun run package
+```
+
+This checks that the two versions match, runs `bun run check` (typecheck,
+tests, production build), and writes `lekseis-hover-<version>.zip` with
+`manifest.json` at its root. The zip is gitignored.
+
+### 4. Upload
+
+**First release:**
+
+1. In the dashboard, choose **Add new item** and upload the zip.
+2. Fill in the tabs as described in [Listing](#listing-answers) and
+   [Privacy practices](#privacy-practices-answers) below.
+3. On **Distribution**, choose visibility. **Unlisted** is useful for a trial
+   run: only people with the link can install it. Also choose the regions.
+4. Click **Submit for review**.
+
+**Updates:**
+
+1. Open the item → **Package** → **Upload new package**, and choose the zip.
+2. If you added a permission or host, or changed what data is sent, update
+   the **Privacy practices** answers and `PRIVACY.md` too.
+3. **Submit for review**.
+
+Review usually takes a few days. Content scripts on every site (which this
+extension needs) can mean a more thorough review. Users get the update
+automatically after it's approved. Adding a permission makes Chrome disable
+the extension until each user accepts the new permission, so avoid adding
+permissions casually.
+
+### 5. Tag the release
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+## Listing answers
+
+| Field       | Value                                                                                                                  |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Name        | From the manifest: Lekseis Hover                                                                                       |
+| Summary     | From the manifest's `description` (132 characters at most)                                                             |
+| Category    | Education                                                                                                              |
+| Language    | English                                                                                                                |
+
+**Description** (edit as you like):
+
+> Learning a language by reading? Rest the pointer on any word on a page in the
+> language you're learning to see what it means and every form it takes.
+>
+> • Meanings with examples, pronunciation and audio, from Wiktionary
+> • Which form you're looking at: "mange is the present tense of manger"
+> • Full conjugation tables by person and number, with pronouns
+> • Adjectives by gender, number and case; nouns by number and case
+> • Select a phrase to translate it
+> • Spanish tables for Spain, Latin America or Río de la Plata (vos)
+> • Greek tenses named by aspect: present, aorist, dependent, futures
+> • Works only on pages in your languages; turn it on or off per site
+> • Keyboard shortcut, and usable with a screen reader
+>
+> 23 languages, including French, Spanish, German, Italian, Portuguese, Greek,
+> Dutch, Russian, Polish and Japanese. Free, with no account, no tracking and
+> no ads. Dictionary data: Wiktionary via kaikki.org (CC BY-SA). Translation:
+> MyMemory.
+
+## Privacy practices answers
+
+**Single purpose:**
+
+> Shows the meaning and grammatical forms (conjugations, declensions) of words
+> the user points at or selects on web pages in languages they are learning.
+
+**Permission justifications:**
+
+| Permission                           | Justification                                                                                                                                                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `storage`                            | Saves the user's settings: the languages they're learning, translation language, how lookups are triggered, and per-site on/off rules.                                                                         |
+| `contextMenus`                       | Adds "Look up …" to the right-click menu for selected text, so lookups work without hovering.                                                                                                                   |
+| Host `https://kaikki.org/*`          | Fetches the dictionary entry (meanings, pronunciation and inflection tables) for the word the user looks up.                                                                                                   |
+| Host `https://api.mymemory.translated.net/*` | Fetches a translation of the word or phrase the user looks up.                                                                                                                                        |
+| Content script on `http://*/*`, `https://*/*` | Language learners read any site, so the extension must be able to find the word under the pointer and show its popup on any page. It stays idle on pages not in a language the user is learning, and sends nothing but the looked-up text. |
+
+**Remote code:** No. All code is in the package; kaikki.org and MyMemory
+return data (JSON), which is displayed as text and never executed.
+
+**Data usage:** tick **Website content** (the text the user looks up is sent
+to kaikki.org and MyMemory). Nothing else applies: no personal, health,
+financial, authentication, location or communication data, and no browsing
+history or user-activity tracking.
+
+Then certify the three statements:
+- data isn't sold to third parties;
+- it isn't used for purposes unrelated to the single purpose;
+- it isn't used for creditworthiness or lending.
+
+**Privacy policy URL:** see [step 2](#2-put-the-privacy-policy-at-a-public-url).
+
+## Automating uploads (optional)
+
+The [Chrome Web Store API](https://developer.chrome.com/docs/webstore/using-api)
+can upload and publish from a script or CI, using an OAuth client and refresh
+token. It isn't set up here; for occasional releases, the dashboard is simpler.
