@@ -1,0 +1,123 @@
+/* Rendered inside a shadow root, so page styles can't reach in and these can't leak out.
+   Sizes are px, not rem: rem would follow each site's root font size. */
+:host {
+  all: initial;
+  --lh-bg: #ffffff;
+  --lh-fg: #1b1b1f;
+  --lh-muted: #52525b;
+  --lh-border: #d4d4d8;
+  --lh-subtle: #f4f4f5;
+  --lh-accent: #1d4ed8;
+  --lh-mark-bg: #fde68a;
+  --lh-mark-fg: #1b1b1f;
+  --lh-warn: #9a3412;
+}
+@media (prefers-color-scheme: dark) {
+  :host {
+    --lh-bg: #1c1c20;
+    --lh-fg: #ececf1;
+    --lh-muted: #b4b4bd;
+    --lh-border: #3f3f46;
+    --lh-subtle: #27272c;
+    --lh-accent: #93b4ff;
+    --lh-mark-bg: #facc15;
+    --lh-mark-fg: #1b1b1f;
+    --lh-warn: #fdba74;
+  }
+}
+
+.lh-dialog {
+  position: fixed;
+  z-index: 2147483647;
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 16px));
+  max-height: min(70vh, 560px);
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--lh-border);
+  border-radius: 10px;
+  background: var(--lh-bg);
+  color: var(--lh-fg);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.22);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  text-align: start;
+}
+.lh-dialog[hidden] { display: none; }
+.lh-dialog:focus { outline: none; }
+.lh-dialog:focus-visible { outline: 2px solid var(--lh-accent); outline-offset: 2px; }
+
+.lh-titlebar { display: flex; align-items: baseline; gap: 8px; }
+.lh-titlebar h2 { flex: 1; margin: 0; font-size: 18px; font-weight: 650; overflow-wrap: anywhere; }
+
+button, summary, a { color: inherit; font: inherit; }
+button {
+  min-height: 32px;
+  min-width: 32px;
+  padding: 2px 8px;
+  border: 1px solid var(--lh-border);
+  border-radius: 6px;
+  background: var(--lh-subtle);
+  cursor: pointer;
+}
+button:hover { border-color: var(--lh-muted); }
+:is(button, summary, a):focus-visible { outline: 2px solid var(--lh-accent); outline-offset: 2px; }
+.lh-close { font-size: 18px; line-height: 1; }
+
+.lh-pronunciation { display: flex; align-items: center; gap: 8px; margin: 4px 0; color: var(--lh-muted); }
+.lh-ipa { color: var(--lh-muted); }
+.lh-translation { margin: 6px 0; font-size: 15px; }
+.lh-label { color: var(--lh-muted); }
+.lh-formof { margin: 6px 0; padding-inline-start: 18px; }
+.lh-pos {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--lh-border);
+  border-radius: 999px;
+  color: var(--lh-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.lh-entry { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--lh-border); }
+.lh-entry h3 { margin: 0 0 4px; font-size: 16px; }
+.lh-entry h4 { margin: 10px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--lh-muted); }
+.lh-head { margin: 0 0 4px; color: var(--lh-muted); }
+.lh-senses { margin: 4px 0; padding-inline-start: 22px; }
+.lh-senses li { margin: 2px 0; }
+.lh-tags { color: var(--lh-muted); font-style: italic; }
+.lh-example { display: block; color: var(--lh-muted); font-size: 13px; }
+.lh-example > span { font-style: italic; }
+
+details { margin: 2px 0; }
+summary { cursor: pointer; padding: 4px 2px; border-radius: 4px; }
+summary:hover { background: var(--lh-subtle); }
+
+table { width: 100%; margin: 4px 0 8px; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 3px 6px; border: 1px solid var(--lh-border); text-align: start; vertical-align: top; }
+thead th, tbody th { background: var(--lh-subtle); font-weight: 600; }
+.lh-pronoun { color: var(--lh-muted); }
+mark { background: var(--lh-mark-bg); color: var(--lh-mark-fg); border-radius: 2px; padding: 0 2px; font-weight: 650; }
+
+.lh-other { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; margin: 8px 0 0; }
+.lh-other dt { color: var(--lh-muted); }
+.lh-other dd { margin: 0; }
+
+.lh-status, .lh-empty { color: var(--lh-muted); }
+.lh-warnings { margin: 8px 0 0; padding-inline-start: 18px; color: var(--lh-warn); font-size: 12px; }
+footer { margin-top: 10px; font-size: 12px; color: var(--lh-muted); }
+footer a { color: var(--lh-accent); }
+
+.lh-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lh-dialog:not([hidden]) { animation: lh-in 120ms ease-out; }
+  @keyframes lh-in { from { opacity: 0; transform: translateY(-4px); } }
+}
