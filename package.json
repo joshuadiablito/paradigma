@@ -1,0 +1,25 @@
+{
+  "name": "lekseis-hover",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome extension: hover over words in languages you're learning to see meanings, conjugations and declensions.",
+  "scripts": {
+    "build": "rm -rf dist && vite build && vite build -c vite.content.config.ts",
+    "dev": "vite build --watch --mode development & vite build -c vite.content.config.ts --watch --mode development; wait",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "bun run typecheck && bun run test && bun run build",
+    "smoke": "bun scripts/smoke.ts"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.3.4",
+    "@types/node": "24",
+    "jsdom": "30.1.1",
+    "playwright": "1.63.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.1",
+    "vitest": "5.0.2"
+  }
+}
