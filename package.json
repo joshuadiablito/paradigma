@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "bun run typecheck && bun run test && bun run build",
-    "smoke": "bun scripts/smoke.ts"
+    "smoke": "bun scripts/smoke.ts",
+    "icons": "bun scripts/icons.ts",
+    "package": "bun scripts/package.ts"
   },
   "devDependencies": {
     "@types/chrome": "0.3.4",

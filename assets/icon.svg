@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Chrome's guidance: 96×96 artwork centred in 128×128, leaving room for its shadow. -->
+  <rect x="16" y="16" width="96" height="96" rx="22" fill="#1d4ed8"/>
+  <text x="64" y="88" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="72" font-weight="700" fill="#ffffff">λ</text>
+  <circle cx="92" cy="38" r="9" fill="#fde68a"/>
+</svg>
