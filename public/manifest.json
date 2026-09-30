@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Lekseis Hover",
+  "version": "0.1.0",
+  "description": "Hover over words in the languages you're learning to see their meaning, conjugations and declensions.",
+  "minimum_chrome_version": "128",
+  "permissions": ["storage", "contextMenus"],
+  "host_permissions": ["https://kaikki.org/*", "https://api.mymemory.translated.net/*"],
+  "background": { "service_worker": "service-worker.js", "type": "module" },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": { "default_popup": "action/action.html", "default_title": "Lekseis Hover" },
+  "options_ui": { "page": "options/options.html", "open_in_tab": true },
+  "commands": {
+    "lookup-selection": {
+      "suggested_key": { "default": "Alt+Shift+L" },
+      "description": "Look up the selected text"
+    }
+  }
+}

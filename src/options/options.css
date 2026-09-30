@@ -1,0 +1,10 @@
+main { max-width: 44rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+.language-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.25rem 1rem; }
+.language-grid label, .choice { display: flex; align-items: center; gap: 0.5rem; min-height: 44px; }
+input[type="checkbox"], input[type="radio"] { width: 1.15rem; height: 1.15rem; accent-color: var(--accent); }
+.endonym { color: var(--muted); }
+#delay { width: 8rem; display: block; margin-top: 0.25rem; }
+.sites { list-style: none; margin: 0; padding: 0; }
+.sites li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.25rem 0; border-bottom: 1px solid var(--border); }
+.saved { color: var(--ok); min-height: 1.5em; }
+kbd { font: 0.85em ui-monospace, monospace; border: 1px solid var(--border); border-radius: 4px; padding: 0 0.3em; background: var(--subtle); }

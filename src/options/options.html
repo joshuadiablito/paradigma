@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lekseis Hover settings</title>
+    <link rel="stylesheet" href="../shared/page.css" />
+    <link rel="stylesheet" href="./options.css" />
+  </head>
+  <body>
+    <main class="stack">
+      <header>
+        <h1>Lekseis Hover settings</h1>
+        <p class="hint">
+          Pick the languages you're learning. On pages in those languages, rest the pointer on a word
+          to see what it means and all its forms. Select a phrase and hover over it to translate the phrase.
+        </p>
+      </header>
+
+      <form id="settings" novalidate>
+        <fieldset>
+          <legend>Languages I'm learning</legend>
+          <p class="hint" id="learning-hint">Pages in these languages get hover lookups.</p>
+          <div id="learning" class="language-grid" aria-describedby="learning-hint"></div>
+        </fieldset>
+
+        <fieldset id="spanish-variety">
+          <legend>Spanish variety</legend>
+          <p class="hint">Which second-person forms Spanish conjugation tables show.</p>
+          <div class="stack">
+            <label class="choice"><input type="radio" name="spanish-variety" value="spain" /> <span>Spain: <i lang="es">tú</i> and <i lang="es">vosotros</i></span></label>
+            <label class="choice"><input type="radio" name="spanish-variety" value="latin-america" /> <span>Latin America: <i lang="es">tú</i> and <i lang="es">ustedes</i></span></label>
+            <label class="choice"><input type="radio" name="spanish-variety" value="rioplatense" /> <span>Río de la Plata (Argentina, Uruguay): <i lang="es">vos</i> and <i lang="es">ustedes</i></span></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Translate into</legend>
+          <label for="native">My language</label>
+          <select id="native" aria-describedby="native-hint"></select>
+          <p class="hint" id="native-hint">
+            Phrase translations use this language. Dictionary definitions come from English Wiktionary,
+            so they're always in English.
+          </p>
+        </fieldset>
+
+        <fieldset>
+          <legend>When to show a lookup</legend>
+          <div class="stack">
+            <label class="choice"><input type="radio" name="trigger" value="hover" /> When the pointer rests on a word</label>
+            <label class="choice"><input type="radio" name="trigger" value="alt" /> Only while I hold <kbd>Alt</kbd> (<kbd>Option</kbd> on a Mac)</label>
+            <div>
+              <label for="delay">Delay before showing (milliseconds)</label>
+              <input id="delay" type="number" inputmode="numeric" step="50" aria-describedby="delay-hint" />
+              <p class="hint" id="delay-hint"></p>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Site rules</legend>
+          <p class="hint">
+            Normally the page language is detected automatically. Rules override that for a site;
+            add them from the toolbar button while you're on the site.
+          </p>
+          <p id="no-sites" class="hint" tabindex="-1">No site rules yet.</p>
+          <ul id="sites" class="sites"></ul>
+        </fieldset>
+
+        <fieldset>
+          <legend>Keyboard</legend>
+          <p class="hint">
+            Select text and press the shortcut (<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> by default) to look it up.
+            Focus moves into the lookup; press <kbd>Escape</kbd> to close it.
+            <button type="button" id="shortcuts">Change keyboard shortcut</button>
+          </p>
+        </fieldset>
+      </form>
+      <p id="saved" role="status" class="saved"></p>
+    </main>
+    <script type="module" src="./options.ts"></script>
+  </body>
+</html>

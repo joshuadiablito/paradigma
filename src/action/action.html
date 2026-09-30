@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Lekseis Hover</title>
+    <link rel="stylesheet" href="../shared/page.css" />
+    <style>
+      body { width: 20rem; }
+      main { padding: 1rem; }
+      select { width: 100%; }
+      #status { margin: 0 0 1rem; }
+    </style>
+  </head>
+  <body>
+    <main class="stack">
+      <h1>Lekseis Hover</h1>
+      <p id="status" role="status">Checking this page…</p>
+      <div id="site-controls" hidden>
+        <label for="site-rule">On <strong id="host"></strong></label>
+        <select id="site-rule"></select>
+      </div>
+      <p><a href="#" id="open-options">Settings</a></p>
+    </main>
+    <script type="module" src="./action.ts"></script>
+  </body>
+</html>
