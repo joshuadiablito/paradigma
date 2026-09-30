@@ -29,7 +29,7 @@ const url = `http://localhost:${server.port}/`;
 const context = await chromium.launchPersistentContext("", {
   channel: "chromium",
   headless: true,
-  viewport: { width: 1100, height: 900 },
+  viewport: { width: 1280, height: 800 }, // the Web Store's screenshot size
   args: [`--disable-extensions-except=${dist}`, `--load-extension=${dist}`],
 });
 
