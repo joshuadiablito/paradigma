@@ -199,11 +199,18 @@ page ──select──▶ content script ──message──▶ service worker 
     picks the main translation per language (preferring one with no regional
     or slang label), and fetches that word's own entry for its forms.
     Phrases, and words with no dictionary translation, go to MyMemory.
+    Languages are translated on demand, one tab at a time: a lookup fetches
+    the English entry (`translateSource()`) and only the language whose tab
+    opens first, which is the one you last chose. Other tabs ask the service
+    worker for their language (`translateLanguage()`) when first shown,
+    reusing the English entry already fetched, so a lookup spends one
+    language's share of your MyMemory allowance, not every language's.
   - **explain** (`explain()`) is for text in a language you're learning. It
     fetches the word's entry, follows an inflected form to its lemma
     (_mange_ → _manger_), and machine-translates the text into your language.
 
-  Results are cached in memory. Fetching happens in the service worker because
+  Results are cached in memory, the shared English entry and each language
+  separately. Fetching happens in the service worker because
   kaikki.org sends no CORS headers, and only the extension's host permissions
   get around that.
 - **Inflection tables** are built from Wiktionary's tagged forms
@@ -219,7 +226,7 @@ Both are free and need no key or account.
 - **[kaikki.org](https://kaikki.org/)**: English Wiktionary as JSON
   (extracted by wiktextract). It supplies definitions, IPA, audio, the lemma
   for inflected forms, and inflection tables. The content is CC BY-SA and
-  attributed in every popup.
+  attributed in every popup that shows it.
 - **[MyMemory](https://mymemory.translated.net/)**: machine translation of
   phrases. Anonymous use is limited to about 5,000 characters a day. Users
   can raise their own limit to 50,000 by entering an email address in
