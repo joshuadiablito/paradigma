@@ -149,7 +149,7 @@ git push origin v0.1.0
 
 | Permission                           | Justification                                                                                                                                                                                                   |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `storage`                            | Saves the user's settings: the languages they're learning, translation language, how lookups are triggered, and per-site on/off rules.                                                                         |
+| `storage`                            | Saves the user's settings: the languages they're learning, translation language, how lookups are triggered, per-site on/off rules, and an optional email address for MyMemory's higher limit.                |
 | `contextMenus`                       | Adds "Look up …" to the right-click menu for selected text, so lookups work without hovering.                                                                                                                   |
 | Host `https://kaikki.org/*`          | Fetches the dictionary entry (meanings, pronunciation and inflection tables) for the word the user looks up.                                                                                                   |
 | Host `https://api.mymemory.translated.net/*` | Fetches a translation of the word or phrase the user looks up.                                                                                                                                        |
@@ -158,10 +158,17 @@ git push origin v0.1.0
 **Remote code:** No. All code is in the package; kaikki.org and MyMemory
 return data (JSON), which is displayed as text and never executed.
 
-**Data usage:** tick **Website content** (the text the user looks up is sent
-to kaikki.org and MyMemory). Nothing else applies: no personal, health,
-financial, authentication, location or communication data, and no browsing
-history or user-activity tracking.
+**Data usage:** tick these two:
+
+- **Personally identifiable information**: the optional email address the
+  user can enter in settings. It's provided by the user, stored in
+  `chrome.storage.sync`, and sent only to MyMemory with translation requests,
+  to raise MyMemory's free daily limit.
+- **Website content**: the text the user looks up is sent to kaikki.org and
+  MyMemory.
+
+Nothing else applies: no health, financial, authentication, location or
+communication data, and no browsing history or user-activity tracking.
 
 Then certify the three statements:
 - data isn't sold to third parties;

@@ -39,6 +39,7 @@ After installing, the settings page opens. Tick the languages you're learning.
 | Look up from the mouse menu           | Select text, right-click → **Look up "…"**                           |
 | Keep the popup open to read or scroll | Click inside it; close with <kbd>Escape</kbd> or ×                   |
 | Force a site on or off                | Toolbar button → choose a rule for the site                          |
+| Translate more each day               | Settings → **Translation limit** → enter your email (optional)       |
 
 A page is active when its `lang` attribute or Chrome's language detection says
 it's in a language you're learning. Passages marked with their own `lang` are
@@ -178,7 +179,10 @@ Both are free and need no key or account.
   for inflected forms, and inflection tables. The content is CC BY-SA and
   attributed in every popup.
 - **[MyMemory](https://mymemory.translated.net/)**: machine translation of
-  phrases. Anonymous use is limited to about 5,000 characters a day.
+  phrases. Anonymous use is limited to about 5,000 characters a day. Users
+  can raise their own limit to 50,000 by entering an email address in
+  settings, which is then sent to MyMemory (and only MyMemory) as the `de`
+  parameter. Without it, translation still works up to the lower limit.
 
 ### Source layout
 
@@ -226,8 +230,9 @@ first submission, the store listing, the privacy answers and updates.
 ## Privacy
 
 See **[PRIVACY.md](PRIVACY.md)**. In short: the text you look up is sent to
-kaikki.org and MyMemory to be looked up. Nothing else leaves your browser, and
-there is no analytics or account.
+kaikki.org and MyMemory to be looked up. If you enter an email address for a
+higher translation limit, it's sent to MyMemory only. Nothing else leaves your
+browser, and there is no analytics or account.
 
 ## Known limitations
 

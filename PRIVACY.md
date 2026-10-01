@@ -1,6 +1,6 @@
 # Lekseis Hover privacy policy
 
-_Last updated: 30 September 2026_
+_Last updated: 1 October 2026_
 
 Lekseis Hover helps you learn languages by showing the meaning and forms of
 words on web pages. This policy explains what data it handles.
@@ -14,12 +14,27 @@ the keyboard shortcut or the context menu), **the word or selected text** and
 - **kaikki.org**, which provides the Wiktionary dictionary data. A request
   names the word being looked up, e.g. `kaikki.org/dictionary/French/…/manger.jsonl`.
 - **MyMemory** (api.mymemory.translated.net), which provides machine
-  translation. It receives the text, up to 500 bytes, and the language pair.
+  translation. It receives the text, up to 500 bytes, and the language pair,
+  plus your email address if you've chosen to give one (see below).
   See [MyMemory's privacy policy](https://mymemory.translated.net/doc/privacy.php).
 
 These services also see what any website sees: your IP address and browser
 details. Nothing else is sent. That excludes the page's address, the rest of
-the page, your settings, and any identifier for you.
+the page and your other settings. No identifier for you is sent, apart from
+the optional email address below, and that only to MyMemory.
+
+### Optional: your email address
+
+MyMemory limits free translation to about 5,000 characters a day, or 50,000 a
+day for requests that include an email address. You can enter one under
+**Translation limit** on the settings page. It's optional, and nothing else
+in the extension needs it.
+
+- It's sent **only to MyMemory**, as part of every translation request, so
+  MyMemory can apply the higher limit. kaikki.org and Wikimedia never receive it.
+- It's stored with your other settings in `chrome.storage.sync` (see below).
+- To remove it, clear the field on the settings page. It's then deleted from
+  your settings and no longer sent.
 
 Pronunciation audio, when you press **Listen**, is loaded from Wikimedia
 (upload.wikimedia.org).
@@ -27,9 +42,9 @@ Pronunciation audio, when you press **Listen**, is loaded from Wikimedia
 ## What stays in your browser
 
 - **Settings** (languages, translation language, trigger, delay, Spanish
-  variety and per-site rules) are stored with `chrome.storage.sync`. If you use
-  Chrome sync, Google syncs them between your browsers. The site rules name the
-  sites you set them for.
+  variety, per-site rules and the optional email address) are stored with
+  `chrome.storage.sync`. If you use Chrome sync, Google syncs them between your
+  browsers. The site rules name the sites you set them for.
 - **Recent lookups** are cached in memory to avoid repeat requests. They are
   discarded when Chrome stops the extension's service worker.
 - To decide whether a page is in a language you're learning, the extension
@@ -41,7 +56,8 @@ Pronunciation audio, when you press **Listen**, is loaded from Wikimedia
 
 - No analytics, tracking, advertising or accounts.
 - No data is sold or transferred to anyone other than the two lookup services
-  above, and only for performing the lookup you asked for.
+  above, and only for performing the lookup you asked for (and, if you gave
+  one, sending your email address to MyMemory for its higher limit).
 - Nothing is used for creditworthiness, lending or any purpose unrelated to
   the extension's single purpose.
 
