@@ -156,6 +156,29 @@ try {
   check(await options.getByLabel(/Latin America/).isChecked(), "options: Latin American Spanish is chosen");
   check(await options.getByLabel("Whenever I select text").isChecked(), "options: lookups on selection");
   await options.screenshot({ path: `${out}/options.png`, fullPage: true });
+
+  // The optional MyMemory email: labelled, invalid addresses rejected, valid ones saved.
+  const storedEmail = () => worker.evaluate(async () => (await chrome.storage.sync.get("myMemoryEmail")).myMemoryEmail);
+  const email = options.getByRole("textbox", { name: "Email address (optional)" });
+  check(await email.count() === 1, "options: the email field has an accessible label");
+  check(
+    (await email.getAttribute("aria-describedby")) === "email-hint" && (await options.locator("#email-hint").innerText()).includes("50,000"),
+    "options: the email field is described by its hint",
+  );
+  await email.fill("not an email");
+  await email.press("Tab");
+  check(await email.getAttribute("aria-invalid") === "true", "options: an invalid email is marked invalid");
+  check((await options.locator("#saved").innerText()).startsWith("Not saved"), "options: an invalid email is announced as not saved");
+  check(!(await storedEmail()), "options: an invalid email is not stored");
+  await email.fill("learner@example.com");
+  await email.press("Tab");
+  await options.locator("#saved", { hasText: "Saved" }).waitFor();
+  check(await storedEmail() === "learner@example.com", "options: a valid email is stored");
+  check(await email.getAttribute("aria-invalid") === null, "options: a valid email clears the error");
+  await email.fill("");
+  await email.press("Tab");
+  await options.locator("#saved", { hasText: "removed" }).waitFor();
+  check(await storedEmail() === "", "options: clearing the email stores nothing");
 } finally {
   await context.close();
   await server.stop(true);

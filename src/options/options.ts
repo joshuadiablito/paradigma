@@ -1,11 +1,13 @@
 import { LANGUAGES, languageByCode } from "../shared/languages";
-import { SPANISH_VARIETIES, loadSettings, saveSettings, type Settings } from "../shared/settings";
+import { SPANISH_VARIETIES, loadSettings, plausibleEmail, saveSettings, type Settings } from "../shared/settings";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const learningEl = $<HTMLDivElement>("learning");
 const nativeEl = $<HTMLSelectElement>("native");
 const sitesEl = $<HTMLUListElement>("sites");
+const emailEl = $<HTMLInputElement>("email");
+const emailErrorEl = $<HTMLParagraphElement>("email-error");
 const savedEl = $<HTMLParagraphElement>("saved");
 
 let settings: Settings;
@@ -79,6 +81,27 @@ function renderTrigger(): void {
   }
 }
 
+function renderEmail(): void {
+  emailEl.value = settings.myMemoryEmail;
+  emailEl.onchange = () => {
+    const typed = emailEl.value.trim();
+    const email = plausibleEmail(typed);
+    const invalid = typed !== "" && email === "";
+    emailErrorEl.hidden = !invalid;
+    // The error comes first so it's what a screen reader reads on returning to the field.
+    emailEl.setAttribute("aria-describedby", invalid ? "email-error email-hint" : "email-hint");
+    if (invalid) {
+      emailEl.setAttribute("aria-invalid", "true");
+      clearTimeout(savedTimer);
+      savedEl.textContent = "Not saved: that doesn't look like an email address.";
+      return;
+    }
+    emailEl.removeAttribute("aria-invalid");
+    emailEl.value = email;
+    void save({ ...settings, myMemoryEmail: email }, email ? "email address for MyMemory" : "removed the email address");
+  };
+}
+
 function renderSites(): void {
   const hosts = Object.keys(settings.sites).sort();
   $("no-sites").hidden = hosts.length > 0;
@@ -113,5 +136,6 @@ void loadSettings().then((s) => {
   renderSpanishVariety();
   renderNative();
   renderTrigger();
+  renderEmail();
   renderSites();
 });
