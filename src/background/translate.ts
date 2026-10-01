@@ -6,12 +6,31 @@ export const MYMEMORY_MAX_BYTES = 500;
 
 export class TranslationError extends Error {}
 
+export interface MachineTranslation {
+  text: string;
+  /**
+   * Other renderings MyMemory knows of (its translation memory "matches"),
+   * best first, excluding `text`. Useful when `text` is an inflected form or a
+   * phrase the dictionary has no entry for.
+   */
+  alternatives: string[];
+}
+
 export async function translateWithMyMemory(
   text: string,
   from: string,
   to: string,
   fetchFn: typeof fetch = fetch,
 ): Promise<string> {
+  return (await machineTranslate(text, from, to, fetchFn)).text;
+}
+
+export async function machineTranslate(
+  text: string,
+  from: string,
+  to: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<MachineTranslation> {
   const q = truncateToBytes(text.trim(), MYMEMORY_MAX_BYTES);
   const url = new URL("https://api.mymemory.translated.net/get");
   url.searchParams.set("q", q);
@@ -24,6 +43,7 @@ export async function translateWithMyMemory(
     responseDetails?: string;
     quotaFinished?: boolean;
     responseData?: { translatedText?: string };
+    matches?: { translation?: unknown }[];
   };
 
   const translated = body.responseData?.translatedText?.trim();
@@ -34,7 +54,13 @@ export async function translateWithMyMemory(
   if (Number(body.responseStatus) !== 200 || !translated) {
     throw new TranslationError(body.responseDetails || "MyMemory returned no translation");
   }
-  return decodeEntities(translated);
+  const main = decodeEntities(translated);
+  const alternatives = [...new Set(
+    (body.matches ?? [])
+      .map((m) => (typeof m.translation === "string" ? decodeEntities(m.translation.trim()) : ""))
+      .filter((t) => t && t.toLocaleLowerCase() !== main.toLocaleLowerCase()),
+  )];
+  return { text: main, alternatives };
 }
 
 function truncateToBytes(text: string, max: number): string {

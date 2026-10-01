@@ -1,28 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isDictionaryCandidate, lookupCandidates, wordAt } from "./word";
-
-describe("wordAt", () => {
-  const text = "Je mange une pomme.";
-
-  it("finds the word containing the offset", () => {
-    expect(wordAt(text, 4, "fr")).toEqual({ word: "mange", start: 3, end: 8 });
-  });
-
-  it("returns null on whitespace and punctuation", () => {
-    expect(wordAt(text, 2, "fr")).toBeNull();
-    expect(wordAt(text, 18, "fr")).toBeNull();
-  });
-
-  it("keeps words with internal apostrophes whole", () => {
-    expect(wordAt("C’est aujourd’hui", 10, "fr")?.word).toBe("aujourd’hui");
-  });
-
-  it("segments languages written without spaces", () => {
-    const w = wordAt("私は猫が好きです", 2, "ja");
-    expect(w?.word.length).toBeGreaterThan(0);
-    expect(w?.word).not.toBe("私は猫が好きです");
-  });
-});
+import { isDictionaryCandidate, lookupCandidates } from "./word";
 
 describe("lookupCandidates", () => {
   it("tries the word as written, then lower case", () => {

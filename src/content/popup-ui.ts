@@ -7,7 +7,7 @@ import { renderResult } from "./render";
 const GAP = 8;
 
 /**
- * The lookup popup. A hover opens it without taking focus, so reading isn't
+ * The lookup popup. Selecting text opens it without taking focus, so reading isn't
  * interrupted. Clicking into it, or opening it from the keyboard shortcut,
  * "pins" it: it then stays until closed with Escape, the close button, or a
  * click elsewhere, and focus returns to where it was.

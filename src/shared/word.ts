@@ -1,21 +1,3 @@
-export interface WordSpan {
-  word: string;
-  start: number;
-  end: number;
-}
-
-/**
- * Finds the word containing `offset` in `text`, using the locale's word
- * segmentation (so Japanese and Chinese split sensibly, and "aujourd’hui"
- * stays whole). Returns null when the offset is on whitespace or punctuation.
- */
-export function wordAt(text: string, offset: number, locale: string): WordSpan | null {
-  const segmenter = new Intl.Segmenter(locale, { granularity: "word" });
-  const seg = segmenter.segment(text).containing(offset);
-  if (!seg || !seg.isWordLike) return null;
-  return { word: seg.segment, start: seg.index, end: seg.index + seg.segment.length };
-}
-
 // Elided articles and pronouns: French l’, d’, qu’, j’…; Italian dell’, un’…; Catalan l’, d’.
 const ELISION = /^(\p{L}{1,4})['’](\p{L}.*)$/u;
 

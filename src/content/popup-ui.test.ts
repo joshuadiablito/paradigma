@@ -24,7 +24,7 @@ describe("LookupPopup", () => {
     expect(title.getAttribute("lang")).toBe("fr");
   });
 
-  it("does not take focus when opened by hovering", () => {
+  it("does not take focus when opened by selecting with the mouse", () => {
     button.focus();
     popup.showLoading("mange", "fr", rect, { focus: false });
     expect(document.activeElement).toBe(button);

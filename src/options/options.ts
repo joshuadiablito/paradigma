@@ -1,11 +1,10 @@
 import { LANGUAGES, languageByCode } from "../shared/languages";
-import { HOVER_DELAY_RANGE, SPANISH_VARIETIES, loadSettings, saveSettings, type Settings } from "../shared/settings";
+import { SPANISH_VARIETIES, loadSettings, saveSettings, type Settings } from "../shared/settings";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const learningEl = $<HTMLDivElement>("learning");
 const nativeEl = $<HTMLSelectElement>("native");
-const delayEl = $<HTMLInputElement>("delay");
 const sitesEl = $<HTMLUListElement>("sites");
 const savedEl = $<HTMLParagraphElement>("saved");
 
@@ -66,7 +65,7 @@ function renderNative(): void {
   );
   nativeEl.value = settings.native;
   nativeEl.onchange = () =>
-    void save({ ...settings, native: nativeEl.value }, `translating into ${languageByCode(nativeEl.value)?.name}`);
+    void save({ ...settings, native: nativeEl.value }, `my language is ${languageByCode(nativeEl.value)?.name}`);
 }
 
 function renderTrigger(): void {
@@ -74,25 +73,10 @@ function renderTrigger(): void {
     radio.checked = radio.value === settings.trigger;
     radio.onchange = () => {
       if (!radio.checked) return;
-      const trigger = radio.value === "alt" ? "alt" : "hover";
-      void save({ ...settings, trigger }, trigger === "alt" ? "look up only while Alt is held" : "look up on hover");
+      const trigger = radio.value === "alt" ? "alt" : "select";
+      void save({ ...settings, trigger }, trigger === "alt" ? "look up only when Alt is held" : "look up whenever text is selected");
     };
   }
-}
-
-function renderDelay(): void {
-  Object.assign(delayEl, { min: HOVER_DELAY_RANGE.min, max: HOVER_DELAY_RANGE.max, value: settings.hoverDelayMs });
-  $("delay-hint").textContent = `Between ${HOVER_DELAY_RANGE.min} and ${HOVER_DELAY_RANGE.max}.`;
-  delayEl.onchange = () => {
-    const value = Number(delayEl.value);
-    if (!Number.isFinite(value) || value < HOVER_DELAY_RANGE.min || value > HOVER_DELAY_RANGE.max) {
-      delayEl.setAttribute("aria-invalid", "true");
-      savedEl.textContent = `Not saved: the delay must be between ${HOVER_DELAY_RANGE.min} and ${HOVER_DELAY_RANGE.max} milliseconds.`;
-      return;
-    }
-    delayEl.removeAttribute("aria-invalid");
-    void save({ ...settings, hoverDelayMs: value }, `delay of ${value} milliseconds`);
-  };
 }
 
 function renderSites(): void {
@@ -129,6 +113,5 @@ void loadSettings().then((s) => {
   renderSpanishVariety();
   renderNative();
   renderTrigger();
-  renderDelay();
   renderSites();
 });

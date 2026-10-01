@@ -105,7 +105,35 @@ mark { background: var(--lh-mark-bg); color: var(--lh-mark-fg); border-radius: 2
 .lh-status, .lh-empty { color: var(--lh-muted); }
 .lh-warnings { margin: 8px 0 0; padding-inline-start: 18px; color: var(--lh-warn); font-size: 12px; }
 footer { margin-top: 10px; font-size: 12px; color: var(--lh-muted); }
-footer a { color: var(--lh-accent); }
+footer a, .lh-wikt { color: var(--lh-accent); }
+.lh-wikt-row { margin: 8px 0 0; font-size: 13px; }
+
+/* Language tabs */
+.lh-tablist { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 0; border-bottom: 1px solid var(--lh-border); }
+.lh-tablist [role="tab"] {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: none;
+  color: var(--lh-muted);
+}
+.lh-tablist [role="tab"][aria-selected="true"] {
+  border-bottom-color: var(--lh-accent);
+  color: var(--lh-fg);
+  font-weight: 650;
+}
+.lh-tabpanel { padding-top: 8px; }
+.lh-tabpanel:focus-visible { outline: 2px solid var(--lh-accent); outline-offset: 2px; border-radius: 4px; }
+
+/* Translations by meaning */
+.lh-tr-senses { margin: 4px 0 8px; padding-inline-start: 18px; }
+.lh-tr-senses li { margin: 3px 0; }
+.lh-sense { color: var(--lh-muted); }
+.lh-tr-word strong { font-size: 15px; }
+.lh-roman, .lh-gender { color: var(--lh-muted); }
+.lh-gender { text-decoration: none; font-style: italic; }
 
 .lh-sr-only {
   position: absolute;

@@ -11,12 +11,6 @@ describe("sanitiseSettings", () => {
     expect(sanitiseSettings({ learning: ["fr", "xx", "fr", 3, "de"] }).learning).toEqual(["fr", "de"]);
   });
 
-  it("clamps the hover delay", () => {
-    expect(sanitiseSettings({ hoverDelayMs: 5 }).hoverDelayMs).toBe(100);
-    expect(sanitiseSettings({ hoverDelayMs: 99_999 }).hoverDelayMs).toBe(2000);
-    expect(sanitiseSettings({ hoverDelayMs: "fast" }).hoverDelayMs).toBe(DEFAULT_SETTINGS.hoverDelayMs);
-  });
-
   it("keeps valid site rules and drops invalid ones", () => {
     const { sites } = sanitiseSettings({
       sites: {
@@ -34,8 +28,12 @@ describe("sanitiseSettings", () => {
     expect(sanitiseSettings({ spanishVariety: "mexico" }).spanishVariety).toBe("spain");
   });
 
-  it("falls back to hover for an unknown trigger", () => {
-    expect(sanitiseSettings({ trigger: "telepathy" }).trigger).toBe("hover");
+  it("drops settings from older versions", () => {
+    expect(sanitiseSettings({ hoverDelayMs: 400, trigger: "hover" })).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it("falls back to selection for an unknown trigger", () => {
+    expect(sanitiseSettings({ trigger: "telepathy" }).trigger).toBe("select");
     expect(sanitiseSettings({ trigger: "alt" }).trigger).toBe("alt");
   });
 });

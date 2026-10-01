@@ -66,24 +66,49 @@ describe("parseKaikki", () => {
   it("recognises an inflected form and names its lemma", () => {
     const mange = entry("french-mange", "verb");
     expect(mange.senses).toEqual([]);
-    expect(mange.formOf).toContainEqual({
+    expect(mange.formOf).toContainEqual(expect.objectContaining({
       lemma: "manger",
       description: "first/third-person singular present indicative/subjunctive",
-    });
+    }));
   });
 
   it("strips the trailing 'of <lemma>' from form descriptions", () => {
-    expect(entry("spanish-comia", "verb").formOf[0]).toEqual({
+    expect(entry("spanish-comia", "verb").formOf[0]).toMatchObject({
       lemma: "comer",
       description: "first/third-person singular imperfect indicative",
     });
   });
 
   it("strips a romanised lemma from form descriptions", () => {
-    expect(entry("greek-egrapsa", "verb").formOf[0]).toEqual({
+    expect(entry("greek-egrapsa", "verb").formOf[0]).toMatchObject({
       lemma: "γράφω",
       description: "first-person singular simple past",
     });
+  });
+
+  it("keeps translations only into the languages asked for, in Wiktionary's order", () => {
+    const eat = parseKaikki(fixture("english-eat"), { translationsInto: ["es", "el"] }).find((e) => e.pos === "verb")!;
+    expect(new Set(eat.translations.map((t) => t.lang))).toEqual(new Set(["es", "el"]));
+    expect(eat.translations.find((t) => t.lang === "es")).toMatchObject({ word: "comer", sense: "to ingest" });
+  });
+
+  it("keeps translations' gender and romanisation", () => {
+    const house = parseKaikki(fixture("english-house"), { translationsInto: ["fr", "el"] }).find((e) => e.pos === "noun")!;
+    expect(house.translations.find((t) => t.lang === "fr")).toMatchObject({ word: "maison", tags: ["feminine"] });
+    expect(house.translations.find((t) => t.lang === "el")).toMatchObject({ word: "σπίτι", roman: "spíti" });
+  });
+
+  it("keeps no translations unless asked", () => {
+    expect(parseKaikki(fixture("english-eat")).every((e) => e.translations.length === 0)).toBe(true);
+  });
+
+  it("keeps a form's labels, so rare forms can be told apart", () => {
+    const book = parseKaikki(fixture("english-book")).flatMap((e) => e.formOf);
+    expect(book).toContainEqual(expect.objectContaining({ lemma: "bake", tags: expect.arrayContaining(["dialectal"]) }));
+  });
+
+  it("treats an alternative form like an inflected one, so its main spelling is fetched", () => {
+    expect(entry("greek-xechno", "verb").formOf).toEqual([{ lemma: "ξεχνάω", description: "alternative form" }]);
   });
 
   it("marks which forms came from an inflection table", () => {

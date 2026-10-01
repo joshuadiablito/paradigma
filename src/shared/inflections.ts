@@ -284,7 +284,10 @@ export function buildInflections(entry: Entry, lang: string, options: Inflection
     });
   }
 
-  return { tables, other: [...other].map(([l, forms]) => ({ label: l, forms })) };
+  // Tables by person (the tenses) come before the rest (Spanish past participle
+  // by gender and number), keeping Wiktionary's order within each group.
+  const byPersonFirst = [...tables].sort((a, b) => Number(b.rowHeading === "Person") - Number(a.rowHeading === "Person"));
+  return { tables: byPersonFirst, other: [...other].map(([l, forms]) => ({ label: l, forms })) };
 }
 
 /**

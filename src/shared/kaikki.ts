@@ -2,7 +2,7 @@
 // English Wiktionary, extracted by wiktextract. One line per part of speech.
 // https://kaikki.org/dictionary/rawdata.html
 
-import type { Entry, Form, FormOf, Sense } from "./types";
+import type { Entry, Form, FormOf, Sense, Translation } from "./types";
 
 export function kaikkiUrl(languageName: string, word: string): string {
   const chars = Array.from(word);
@@ -37,9 +37,18 @@ interface RawSense {
   glosses?: unknown;
   tags?: unknown;
   form_of?: unknown;
+  alt_of?: unknown;
   examples?: unknown;
 }
+interface RawTranslation {
+  code?: unknown;
+  word?: unknown;
+  sense?: unknown;
+  tags?: unknown;
+  roman?: unknown;
+}
 interface RawEntry {
+  translations?: unknown;
   word?: unknown;
   pos?: unknown;
   senses?: unknown;
@@ -84,7 +93,13 @@ function parseSenses(raw: unknown): { senses: Sense[]; formOf: FormOf[] } {
     if (lemma) {
       // "…simple past of γράφω (gráfo)": drop the lemma and any romanisation after it.
       const trailingLemma = new RegExp(`\\s+of\\s+${escapeRegExp(lemma)}(\\s*\\([^)]*\\))?$`);
-      formOf.push({ lemma, description: gloss.replace(trailingLemma, "") });
+      formOf.push({ lemma, description: gloss.replace(trailingLemma, ""), tags });
+      continue;
+    }
+    // "alternative form of ξεχνάω": the other spelling has the full entry and table.
+    const alternative = objects<{ word?: unknown }>(s.alt_of).map((f) => str(f.word)).find(Boolean);
+    if (alternative) {
+      formOf.push({ lemma: alternative, description: "alternative form" });
       continue;
     }
     const ex = objects<{ text?: unknown; translation?: unknown; english?: unknown }>(s.examples)[0];
@@ -99,11 +114,31 @@ function parseSenses(raw: unknown): { senses: Sense[]; formOf: FormOf[] } {
   return { senses, formOf };
 }
 
+/** Translations into the given languages, in Wiktionary's order (most common meaning first). */
+function parseTranslations(raw: unknown, langs: ReadonlySet<string>): Translation[] {
+  const out: Translation[] = [];
+  for (const t of objects<RawTranslation>(raw)) {
+    const lang = str(t.code);
+    const word = str(t.word)?.trim();
+    if (!lang || !word || !langs.has(lang)) continue;
+    const roman = str(t.roman);
+    // "to ingest — see also consume, ingest": keep the meaning, drop the cross-reference.
+    const sense = (str(t.sense) ?? "").split(" — ")[0]!.trim();
+    out.push({ lang, word, sense, tags: strings(t.tags), ...(roman ? { roman } : {}) });
+  }
+  return out;
+}
+
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function parseKaikkiEntry(raw: RawEntry): Entry | undefined {
+export interface ParseOptions {
+  /** Languages to keep translations for (ISO codes). Default: none. */
+  translationsInto?: readonly string[];
+}
+
+export function parseKaikkiEntry(raw: RawEntry, options: ParseOptions = {}): Entry | undefined {
   const word = str(raw.word);
   const pos = str(raw.pos);
   if (!word || !pos) return undefined;
@@ -124,16 +159,17 @@ export function parseKaikkiEntry(raw: RawEntry): Entry | undefined {
     senses,
     forms: parseForms(raw.forms, word),
     formOf,
+    translations: parseTranslations(raw.translations, new Set(options.translationsInto ?? [])),
   };
 }
 
 /** Parses a kaikki.org JSONL response. Malformed lines are skipped. */
-export function parseKaikki(jsonl: string): Entry[] {
+export function parseKaikki(jsonl: string, options: ParseOptions = {}): Entry[] {
   const entries: Entry[] = [];
   for (const line of jsonl.split("\n")) {
     if (!line.trim()) continue;
     try {
-      const entry = parseKaikkiEntry(JSON.parse(line) as RawEntry);
+      const entry = parseKaikkiEntry(JSON.parse(line) as RawEntry, options);
       if (entry) entries.push(entry);
     } catch {
       // A truncated or malformed line loses that part of speech, not the lookup.

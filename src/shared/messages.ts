@@ -26,6 +26,7 @@ export type ActivationReason =
   | "site-off"
   | "page-lang"
   | "detected"
+  | "assumed"
   | "not-learning"
   | "no-languages";
 

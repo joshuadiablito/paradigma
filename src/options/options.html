@@ -12,15 +12,26 @@
       <header>
         <h1>Lekseis Hover settings</h1>
         <p class="hint">
-          Pick the languages you're learning. On pages in those languages, rest the pointer on a word
-          to see what it means and all its forms. Select a phrase and hover over it to translate the phrase.
+          Select a word (double-click it) or a phrase on any page to look it up. In your own language,
+          you'll see it in each language you're learning, with all its forms. In a language you're learning,
+          you'll see what it means in your language and its other forms.
         </p>
       </header>
 
       <form id="settings" novalidate>
         <fieldset>
+          <legend>My language</legend>
+          <label for="native">The language I speak</label>
+          <select id="native" aria-describedby="native-hint"></select>
+          <p class="hint" id="native-hint">
+            Text you select in this language is translated into the languages you're learning. Dictionary
+            translations by meaning are only available from English; other languages get machine translation.
+          </p>
+        </fieldset>
+
+        <fieldset>
           <legend>Languages I'm learning</legend>
-          <p class="hint" id="learning-hint">Pages in these languages get hover lookups.</p>
+          <p class="hint" id="learning-hint">Each gets its own tab when you look something up.</p>
           <div id="learning" class="language-grid" aria-describedby="learning-hint"></div>
         </fieldset>
 
@@ -35,25 +46,10 @@
         </fieldset>
 
         <fieldset>
-          <legend>Translate into</legend>
-          <label for="native">My language</label>
-          <select id="native" aria-describedby="native-hint"></select>
-          <p class="hint" id="native-hint">
-            Phrase translations use this language. Dictionary definitions come from English Wiktionary,
-            so they're always in English.
-          </p>
-        </fieldset>
-
-        <fieldset>
           <legend>When to show a lookup</legend>
           <div class="stack">
-            <label class="choice"><input type="radio" name="trigger" value="hover" /> When the pointer rests on a word</label>
-            <label class="choice"><input type="radio" name="trigger" value="alt" /> Only while I hold <kbd>Alt</kbd> (<kbd>Option</kbd> on a Mac)</label>
-            <div>
-              <label for="delay">Delay before showing (milliseconds)</label>
-              <input id="delay" type="number" inputmode="numeric" step="50" aria-describedby="delay-hint" />
-              <p class="hint" id="delay-hint"></p>
-            </div>
+            <label class="choice"><input type="radio" name="trigger" value="select" /> <span>Whenever I select text</span></label>
+            <label class="choice"><input type="radio" name="trigger" value="alt" /> <span>Only when I hold <kbd>Alt</kbd> (<kbd>Option</kbd> on a Mac) while selecting, so plain selecting is left for copying</span></label>
           </div>
         </fieldset>
 

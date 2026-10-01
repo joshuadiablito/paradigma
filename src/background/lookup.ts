@@ -1,43 +1,63 @@
-import { kaikkiUrl, parseKaikki } from "../shared/kaikki";
+import { kaikkiUrl, parseKaikki, type ParseOptions } from "../shared/kaikki";
 import { languageByCode } from "../shared/languages";
-import type { Entry, LookupResult } from "../shared/types";
+import type { Entry, ExplainResult, LanguageTranslation, TranslateResult, TranslationSense } from "../shared/types";
 import { isDictionaryCandidate, lookupCandidates } from "../shared/word";
-import { translateWithMyMemory } from "./translate";
+import { machineTranslate, translateWithMyMemory, type MachineTranslation } from "./translate";
 
 const MAX_LEMMAS = 3;
+const MAX_SENSES = 4;
+const MAX_WORDS_PER_SENSE = 4;
+/** Translations Wiktionary labels like this aren't worth teaching. */
+const UNHELPFUL = new Set(["obsolete", "archaic", "dated", "rare", "historical"]);
+/** Labels that describe a word's grammar rather than restrict its use. */
+const GRAMMATICAL = new Set(["masculine", "feminine", "neuter", "common", "plural", "singular", "perfective", "imperfective"]);
 
-export interface LookupOptions {
-  text: string;
-  /** Language of the text. */
-  lang: string;
-  /** Language to translate into. */
-  target: string;
-  fetchFn?: typeof fetch;
-}
+type Fetch = typeof fetch;
 
 /** Fetches one spelling from kaikki.org. A 404 means "no such word", not an error. */
-async function fetchEntries(languageName: string, word: string, fetchFn: typeof fetch): Promise<Entry[]> {
+async function fetchEntries(languageName: string, word: string, fetchFn: Fetch, options: ParseOptions = {}) {
   const res = await fetchFn(kaikkiUrl(languageName, word));
   if (res.status === 404) return [];
   if (!res.ok) throw new Error(`kaikki.org responded ${res.status}`);
-  return parseKaikki(await res.text());
+  return parseKaikki(await res.text(), options);
 }
 
-async function lookUpDictionary(text: string, languageName: string, fetchFn: typeof fetch) {
+/**
+ * Looks a word up under each plausible spelling until one is found, then
+ * fetches the lemmas it is a form of ("mange" → "manger", "ate" → "eat").
+ */
+async function lookUpWord(text: string, languageName: string, fetchFn: Fetch, options: ParseOptions = {}) {
   let entries: Entry[] = [];
   for (const candidate of lookupCandidates(text)) {
-    entries = await fetchEntries(languageName, candidate, fetchFn);
+    entries = await fetchEntries(languageName, candidate, fetchFn, options);
     if (entries.length > 0) break;
   }
-
-  // "mange" is an inflection of "manger": fetch the lemma for its meaning and tables.
   const own = new Set(entries.map((e) => e.word));
   const lemmaWords = [...new Set(entries.flatMap((e) => e.formOf.map((f) => f.lemma)))]
     .filter((w) => !own.has(w))
     .slice(0, MAX_LEMMAS);
-  const settled = await Promise.allSettled(lemmaWords.map((w) => fetchEntries(languageName, w, fetchFn)));
+  const settled = await Promise.allSettled(lemmaWords.map((w) => fetchEntries(languageName, w, fetchFn, options)));
   const lemmas = settled.flatMap((s) => (s.status === "fulfilled" ? s.value : []));
   return { entries, lemmas };
+}
+
+function languageName(code: string): string {
+  const language = languageByCode(code);
+  if (!language) throw new Error(`Unsupported language: ${code}`);
+  return language.name;
+}
+
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+// ── Explain: a word in a language being learned ─────────────────────────────
+
+export interface ExplainOptions {
+  text: string;
+  /** Language of the text: one being learned. */
+  lang: string;
+  /** The user's language, to translate into. */
+  target: string;
+  fetchFn?: Fetch;
 }
 
 /**
@@ -45,15 +65,12 @@ async function lookUpDictionary(text: string, languageName: string, fetchFn: typ
  * MyMemory, in parallel. Either provider failing leaves a warning; the
  * lookup only fails if both do.
  */
-export async function lookUp({ text, lang, target, fetchFn = fetch }: LookupOptions): Promise<LookupResult> {
-  const language = languageByCode(lang);
-  if (!language) throw new Error(`Unsupported language: ${lang}`);
+export async function explain({ text, lang, target, fetchFn = fetch }: ExplainOptions): Promise<ExplainResult> {
+  const name = languageName(lang);
   const query = text.trim();
 
   const [dictionary, translation] = await Promise.allSettled([
-    isDictionaryCandidate(query)
-      ? lookUpDictionary(query, language.name, fetchFn)
-      : Promise.resolve({ entries: [], lemmas: [] }),
+    isDictionaryCandidate(query) ? lookUpWord(query, name, fetchFn) : Promise.resolve({ entries: [], lemmas: [] }),
     lang === target ? Promise.resolve(undefined) : translateWithMyMemory(query, lang, target, fetchFn),
   ]);
 
@@ -65,6 +82,7 @@ export async function lookUp({ text, lang, target, fetchFn = fetch }: LookupOpti
   }
 
   return {
+    kind: "explain",
     query,
     lang,
     entries: dictionary.status === "fulfilled" ? dictionary.value.entries : [],
@@ -76,6 +94,258 @@ export async function lookUp({ text, lang, target, fetchFn = fetch }: LookupOpti
   };
 }
 
-function message(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+// ── Translate: a word or phrase in the user's language ──────────────────────
+
+export interface TranslateOptions {
+  text: string;
+  /** Language of the text: the user's own. */
+  from: string;
+  /** Languages being learned. */
+  targets: string[];
+  fetchFn?: Fetch;
+}
+
+/**
+ * Groups one language's translations by meaning, dropping obsolete and rare
+ * words. Keeps them all; `limitSenses` trims for display once the common
+ * word has been chosen, since it may be far down Wiktionary's list.
+ */
+export function sensesFor(entries: Entry[], lang: string): TranslationSense[] {
+  const senses: TranslationSense[] = [];
+  for (const entry of entries) {
+    for (const t of entry.translations) {
+      if (t.lang !== lang || t.tags.some((tag) => UNHELPFUL.has(tag))) continue;
+      let sense = senses.find((s) => s.pos === entry.pos && s.sense === t.sense);
+      if (!sense) {
+        sense = { pos: entry.pos, sense: t.sense, words: [] };
+        senses.push(sense);
+      }
+      if (!sense.words.some((w) => w.word === t.word)) {
+        sense.words.push({ word: t.word, tags: t.tags, ...(t.roman ? { roman: t.roman } : {}) });
+      }
+    }
+  }
+  return senses;
+}
+
+export function limitSenses(senses: TranslationSense[]): TranslationSense[] {
+  return senses.slice(0, MAX_SENSES).map((s) => ({ ...s, words: s.words.slice(0, MAX_WORDS_PER_SENSE) }));
+}
+
+/** Labels marking a form too rare to translate through: "book" as a dialect past tense of "bake". */
+const MARGINAL_FORM = new Set(["dialectal", "rare", "obsolete", "archaic", "nonstandard", "dated", "nonce-word"]);
+
+/**
+ * The translation to show forms for: the first word of the most common
+ * meaning, preferring one with no register or regional label (so "comer",
+ * not South American "jamear").
+ */
+export function leadTranslation(senses: TranslationSense[]): { word: string; pos: string } | undefined {
+  const first = senses[0];
+  if (!first) return undefined;
+  const plain = first.words.find((w) => w.tags.every((t) => GRAMMATICAL.has(t))) ?? first.words[0];
+  return plain && { word: plain.word, pos: first.pos };
+}
+
+/** The dictionary entry for a translation, following an inflected form to its lemma ("belle" → "beau"). */
+async function targetEntry(word: string, lang: string, pos: string | undefined, fetchFn: Fetch) {
+  const { entries, lemmas } = await lookUpWord(word, languageName(lang), fetchFn);
+  const all = [...entries.filter((e) => e.senses.length > 0), ...lemmas];
+  return all.find((e) => e.pos === pos) ?? all[0];
+}
+
+const MAX_MACHINE_CANDIDATES = 5;
+
+/** Whether an entry's definitions use the English word: "profesor" is glossed "teacher, professor". */
+export function glossesMention(entry: Entry, english: string): boolean {
+  const word = new RegExp(`(^|[^\\p{L}])${escapeRegExp(english.toLocaleLowerCase())}($|[^\\p{L}])`, "u");
+  return entry.senses.some((s) => word.test(s.gloss.toLocaleLowerCase()));
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Words worth looking up from a machine translation: the translation itself,
+ * then MyMemory's alternatives, then the words of short multi-word ones
+ * ("για αναδημοσίευση" → "αναδημοσίευση"). Long sentences are skipped.
+ */
+export function machineCandidates(mt: MachineTranslation): string[] {
+  const whole = [mt.text, ...mt.alternatives]
+    .map((t) => t.replace(/[.,;:!?¿¡"«»“”()]/g, "").trim())
+    .filter((t) => t && t.split(/\s+/).length <= 3);
+  const parts = whole.flatMap((t) => t.split(/\s+/)).filter((w) => [...w].length >= 4);
+  return [...new Set([...whole.filter((t) => !/\s/.test(t)), ...parts, ...whole])].slice(0, MAX_MACHINE_CANDIDATES);
+}
+
+/**
+ * The most useful dictionary entry among candidate translations: one with the
+ * same part of speech as the English word and a table of forms, if any has both.
+ */
+async function bestEntry(candidates: string[], lang: string, pos: string | undefined, fetchFn: Fetch) {
+  let best: { entry: Entry; score: number } | undefined;
+  for (const word of candidates) {
+    const entry = await targetEntry(word, lang, pos, fetchFn).catch(() => undefined);
+    if (!entry) continue;
+    const score = (entry.pos === pos ? 2 : 0) + (entry.forms.length >= 4 ? 1 : 0);
+    if (!best || score > best.score) best = { entry, score };
+    if (score === 3) break;
+  }
+  return best?.entry;
+}
+
+interface SourceHint {
+  /** The English lemma, when the selection is an inflected form ("republish" for "republished"). */
+  lemma?: string;
+  /** The English word's part of speech, to prefer translations of the same kind. */
+  pos?: string;
+}
+
+/**
+ * Picks the common word among dictionary translations. Wiktionary doesn't
+ * order translations by frequency ("enseñador" before "profesor"), nor
+ * meanings ("to leave behind" before "to lose remembrance of"), so a machine
+ * translation breaks the tie: if it names one of the dictionary's words, that
+ * word leads and its meaning moves to the top. The dictionary still decides
+ * what's valid.
+ */
+export function preferMachineChoice(
+  senses: TranslationSense[],
+  mt: MachineTranslation | undefined,
+): { senses: TranslationSense[]; lead?: { word: string; pos: string } } {
+  if (!mt) return { senses };
+  const said = new Set([mt.text, ...mt.alternatives].map((t) => t.toLocaleLowerCase()));
+  const index = senses.findIndex((s) => s.words.some((w) => said.has(w.word.toLocaleLowerCase())));
+  if (index === -1) return { senses };
+  const sense = senses[index]!;
+  const word = sense.words.find((w) => said.has(w.word.toLocaleLowerCase()))!;
+  const reordered = { ...sense, words: [word, ...sense.words.filter((w) => w !== word)] };
+  return { senses: [reordered, ...senses.filter((_, i) => i !== index)], lead: { word: word.word, pos: sense.pos } };
+}
+
+async function translateInto(
+  query: string,
+  from: string,
+  lang: string,
+  english: { entries: Entry[]; lemmas: Entry[] },
+  hint: SourceHint,
+  fetchFn: Fetch,
+): Promise<LanguageTranslation> {
+  // A word's own translations and its base word's: "running" is an adjective
+  // ("three days running") but mostly a form of "run". The base word's come
+  // first when the word is mainly a form of it.
+  const own = sensesFor(english.entries, lang);
+  const base = sensesFor(english.lemmas, lang);
+  // The meanings the selection most likely has: for a form, the base word's
+  // of the same part of speech ("running" → the verb "run", not the noun).
+  const formMeanings = hint.lemma ? base.filter((m) => m.pos === hint.pos) : [];
+  const primary = formMeanings.length > 0 ? formMeanings : [...own, ...base];
+  const secondary = formMeanings.length > 0 ? [...base.filter((m) => m.pos !== hint.pos), ...own] : [];
+  const result: LanguageTranslation = { lang, senses: limitSenses([...primary, ...secondary]) };
+  const single = isDictionaryCandidate(query);
+
+  if (result.senses.length > 0) {
+    const english = hint.lemma ?? query;
+    const mt = await machineTranslate(english, from, lang, fetchFn).catch(() => undefined);
+    const preferred = preferMachineChoice(primary, mt);
+    let senses = [...preferred.senses, ...secondary];
+    let lead = preferred.lead;
+    // The dictionary may simply lack the usual word ("teacher": enseñador but
+    // not profesor). Accept the machine's word if its own entry says it means
+    // the English word.
+    if (!lead && mt && isDictionaryCandidate(mt.text)) {
+      const entry = await targetEntry(mt.text, lang, hint.pos, fetchFn).catch(() => undefined);
+      if (entry && entry.pos === hint.pos && glossesMention(entry, english)) {
+        lead = { word: entry.word, pos: entry.pos };
+        senses = [{ pos: entry.pos, sense: "usual translation", words: [{ word: entry.word, tags: [] }] }, ...senses];
+      }
+    }
+    result.senses = limitSenses(senses);
+    lead ??= leadTranslation(result.senses)!;
+    result.lead = lead.word;
+    try {
+      const entry = await targetEntry(lead.word, lang, lead.pos, fetchFn);
+      if (entry) result.entry = entry;
+    } catch (e) {
+      result.warning = `Dictionary unavailable: ${message(e)}`;
+    }
+    return result;
+  }
+
+  // No dictionary translation: a phrase, or a word Wiktionary doesn't translate
+  // into this language. Machine-translate the base form of a word, as an
+  // inflected one ("republished") tends to come back as a form, or a noun, that
+  // has no dictionary entry.
+  const source = single && hint.lemma ? hint.lemma : query;
+  let mt: MachineTranslation;
+  try {
+    mt = await machineTranslate(source, from, lang, fetchFn);
+  } catch (e) {
+    result.warning = `Translation unavailable: ${message(e)}`;
+    return result;
+  }
+  result.machine = mt.text;
+  if (source !== query) result.machineOf = source;
+  if (!single) return result;
+
+  const candidates = machineCandidates(mt);
+  const entry = await bestEntry(candidates, lang, hint.pos, fetchFn);
+  if (entry) {
+    result.lead = entry.word;
+    result.entry = entry;
+  } else if (candidates[0]) {
+    result.lead = candidates[0];
+  }
+  return result;
+}
+
+/**
+ * Translates text from the user's language into each language being learned.
+ * A word gets Wiktionary's translations by meaning (only English Wiktionary
+ * has translation tables, so only from English) and the forms of the main
+ * translation; a phrase gets a machine translation.
+ */
+export async function translate({ text, from, targets, fetchFn = fetch }: TranslateOptions): Promise<TranslateResult> {
+  const query = text.trim();
+  const warnings: string[] = [];
+  let entries: Entry[] = [];
+  let lemmas: Entry[] = [];
+
+  if (from === "en" && isDictionaryCandidate(query)) {
+    try {
+      ({ entries, lemmas } = await lookUpWord(query, languageName(from), fetchFn, { translationsInto: targets }));
+    } catch (e) {
+      warnings.push(`Dictionary unavailable: ${message(e)}`);
+    }
+  }
+  // Only when the word is mainly a form of another ("ate" → "eat") is it
+  // described as one; "book" being a dialect past tense of "bake" is not.
+  const main = entries[0];
+  const formOf = main && main.senses.length === 0
+    ? main.formOf.find((f) => lemmas.some((l) => l.word === f.lemma))
+    : undefined;
+  const pos = (formOf ? lemmas.find((l) => l.word === formOf.lemma) : main)?.pos;
+  // Translate through the base words of ordinary forms only.
+  const usable = new Set(entries.flatMap((e) => e.formOf)
+    .filter((f) => !(f.tags ?? []).some((t) => MARGINAL_FORM.has(t)))
+    .map((f) => f.lemma));
+  lemmas = lemmas.filter((l) => usable.has(l.word));
+  const hint: SourceHint = { ...(formOf ? { lemma: formOf.lemma } : {}), ...(pos ? { pos } : {}) };
+
+  const languages = await Promise.all(
+    targets.filter((t) => t !== from).map((lang) => translateInto(query, from, lang, { entries, lemmas }, hint, fetchFn)),
+  );
+  if (languages.length > 0 && languages.every((l) => l.warning && l.senses.length === 0 && !l.machine)) {
+    throw new Error(languages[0]!.warning);
+  }
+
+  return {
+    kind: "translate",
+    query,
+    lang: from,
+    ...(formOf ? { source: { lemma: formOf.lemma, description: formOf.description } } : {}),
+    languages,
+    warnings,
+  };
 }

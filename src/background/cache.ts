@@ -1,6 +1,6 @@
 /**
  * A small least-recently-used cache that also shares in-flight promises, so
- * hovering back and forth over a word makes one request, not many. Lives in
+ * selecting the same word again makes one request, not many. Lives in
  * service-worker memory and is lost when Chrome stops the worker; that's fine.
  */
 export class PromiseCache<T> {
@@ -17,7 +17,7 @@ export class PromiseCache<T> {
     }
     const promise = load();
     this.#entries.set(key, promise);
-    // Don't cache failures: the next hover should retry.
+    // Don't cache failures: the next lookup should retry.
     promise.catch(() => {
       if (this.#entries.get(key) === promise) this.#entries.delete(key);
     });

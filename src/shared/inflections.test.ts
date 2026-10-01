@@ -53,7 +53,7 @@ describe("verb conjugation", () => {
 
   it("elides je before a vowel", () => {
     const aimer: Entry = {
-      word: "aimer", pos: "verb", senses: [], formOf: [],
+      word: "aimer", pos: "verb", senses: [], formOf: [], translations: [],
       forms: [{ form: "aime", tags: ["first-person", "singular", "present", "indicative"], fromTable: true }],
     };
     const t = buildInflections(aimer, "fr").tables[0]!;
@@ -171,7 +171,7 @@ describe("adjective agreement", () => {
 
   it("puts a before-vowel form beside the ordinary one", () => {
     const beau: Entry = {
-      word: "beau", pos: "adj", senses: [], formOf: [],
+      word: "beau", pos: "adj", senses: [], formOf: [], translations: [],
       forms: [
         { form: "bel", tags: ["before-vowel", "masculine", "singular"], fromTable: false },
         { form: "belle", tags: ["feminine"], fromTable: false },
@@ -226,7 +226,7 @@ describe("noun declension", () => {
 });
 
 describe("tableContains", () => {
-  it("finds the hovered form regardless of case", () => {
+  it("finds the selected form regardless of case", () => {
     const { tables } = buildInflections(entry("french-manger", "verb"), "fr");
     expect(tableContains(table(tables, "Indicative imperfect"), "Mangeait")).toBe(true);
     expect(tableContains(table(tables, "Indicative present"), "mangeait")).toBe(false);

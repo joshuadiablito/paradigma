@@ -7,13 +7,23 @@ const statusEl = $<HTMLParagraphElement>("status");
 const ruleEl = $<HTMLSelectElement>("site-rule");
 
 const REASONS: Record<StatusResponse["reason"], (lang: string) => string> = {
-  "site-on": (l) => `On: this site is set to ${l}.`,
+  "site-on": (l) => `This site is set to ${l}.`,
   "site-off": () => "Off: turned off for this site.",
-  "page-lang": (l) => `On: this page is in ${l}.`,
-  detected: (l) => `On: this page looks like ${l}.`,
-  "not-learning": () => "Off: this page isn't in a language you're learning.",
+  "page-lang": (l) => `This page is in ${l}.`,
+  detected: (l) => `This page looks like ${l}.`,
+  assumed: (l) => `This page is treated as ${l}, your language.`,
+  "not-learning": () => "Off: this page is neither in your language nor one you're learning.",
   "no-languages": () => "Off: choose the languages you're learning in Settings.",
 };
+
+/** What selecting text will do on this page. */
+function whatSelectingDoes(lang: string, native: string, learning: string[]): string {
+  const name = (code: string) => languageByCode(code)?.name ?? code;
+  if (lang === native) {
+    return ` Select a word or phrase to see it in ${learning.map(name).join(", ") || "the languages you're learning"}.`;
+  }
+  return ` Select a word to see what it means in ${name(native)}, and its other forms.`;
+}
 
 $("open-options").addEventListener("click", (e) => {
   e.preventDefault();
@@ -31,9 +41,10 @@ async function main(): Promise<void> {
     return;
   }
   const langName = status.lang ? (languageByCode(status.lang)?.name ?? status.lang) : "";
-  statusEl.textContent = REASONS[status.reason](langName);
-
   const settings = await loadSettings();
+  statusEl.textContent = REASONS[status.reason](langName)
+    + (status.lang ? whatSelectingDoes(status.lang, settings.native, settings.learning) : "");
+
   const current = settings.sites[status.host];
   $("host").textContent = status.host;
   const option = (value: string, text: string) => Object.assign(document.createElement("option"), { value, textContent: text });

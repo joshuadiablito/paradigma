@@ -6,13 +6,15 @@ export type SpanishVariety = (typeof SPANISH_VARIETIES)[number];
 export type SiteRule = { mode: "on"; lang: string } | { mode: "off" };
 
 export interface Settings {
-  /** Languages the user is learning; pages in these languages get hover lookups. */
+  /** Languages the user is learning. */
   learning: string[];
-  /** Language translations are shown in. */
+  /**
+   * The user's own language. Text selected in it is translated into the
+   * learning languages; text in a learning language is explained in it.
+   */
   native: string;
-  /** "hover": look up whatever the pointer rests on. "alt": only while Alt/Option is held. */
-  trigger: "hover" | "alt";
-  hoverDelayMs: number;
+  /** "select": look up whatever is selected. "alt": only selections made while holding Alt/Option. */
+  trigger: "select" | "alt";
   /** Which second-person forms Spanish conjugation tables show. */
   spanishVariety: SpanishVariety;
   /** Per-hostname overrides of automatic language detection. */
@@ -22,13 +24,10 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   learning: [],
   native: "en",
-  trigger: "hover",
-  hoverDelayMs: 400,
+  trigger: "select",
   spanishVariety: "spain",
   sites: {},
 };
-
-export const HOVER_DELAY_RANGE = { min: 100, max: 2000 } as const;
 
 const isKnown = (code: unknown): code is string =>
   typeof code === "string" && languageByCode(code) !== undefined;
@@ -39,11 +38,7 @@ export function sanitiseSettings(raw: unknown): Settings {
 
   const learning = Array.isArray(r.learning) ? [...new Set(r.learning.filter(isKnown))] : [];
   const native = isKnown(r.native) ? r.native : DEFAULT_SETTINGS.native;
-  const trigger = r.trigger === "alt" ? "alt" : "hover";
-  const delay = typeof r.hoverDelayMs === "number" && Number.isFinite(r.hoverDelayMs)
-    ? Math.round(r.hoverDelayMs)
-    : DEFAULT_SETTINGS.hoverDelayMs;
-  const hoverDelayMs = Math.min(HOVER_DELAY_RANGE.max, Math.max(HOVER_DELAY_RANGE.min, delay));
+  const trigger = r.trigger === "alt" ? "alt" : "select";
 
   const spanishVariety = SPANISH_VARIETIES.find((v) => v === r.spanishVariety) ?? DEFAULT_SETTINGS.spanishVariety;
 
@@ -56,7 +51,7 @@ export function sanitiseSettings(raw: unknown): Settings {
     }
   }
 
-  return { learning, native, trigger, hoverDelayMs, spanishVariety, sites };
+  return { learning, native, trigger, spanishVariety, sites };
 }
 
 export async function loadSettings(): Promise<Settings> {
