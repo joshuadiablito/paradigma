@@ -38,4 +38,15 @@ describe("sanitiseSettings", () => {
     expect(sanitiseSettings({ trigger: "telepathy" }).trigger).toBe("hover");
     expect(sanitiseSettings({ trigger: "alt" }).trigger).toBe("alt");
   });
+
+  it("keeps a plausible email address, trimmed", () => {
+    expect(sanitiseSettings({ myMemoryEmail: "  ana@example.com " }).myMemoryEmail).toBe("ana@example.com");
+    expect(sanitiseSettings({ myMemoryEmail: "a.b+lang@mail.example.co.uk" }).myMemoryEmail).toBe("a.b+lang@mail.example.co.uk");
+  });
+
+  it("drops an email address that isn't plausible", () => {
+    for (const bad of ["", "ana", "ana@", "@example.com", "ana@example", "ana @example.com", "a@b@example.com", 42, null]) {
+      expect(sanitiseSettings({ myMemoryEmail: bad }).myMemoryEmail).toBe("");
+    }
+  });
 });

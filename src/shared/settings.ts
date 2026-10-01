@@ -17,6 +17,11 @@ export interface Settings {
   spanishVariety: SpanishVariety;
   /** Per-hostname overrides of automatic language detection. */
   sites: Record<string, SiteRule>;
+  /**
+   * Optional. Sent to MyMemory with each translation request, which raises the
+   * free daily limit from about 5,000 to 50,000 characters. "" when not given.
+   */
+  myMemoryEmail: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -26,9 +31,21 @@ export const DEFAULT_SETTINGS: Settings = {
   hoverDelayMs: 400,
   spanishVariety: "spain",
   sites: {},
+  myMemoryEmail: "",
 };
 
 export const HOVER_DELAY_RANGE = { min: 100, max: 2000 } as const;
+
+// Deliberately loose: one "@", something before it, and a dot in the domain.
+// It only has to catch typos and junk; MyMemory decides what it accepts.
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** The trimmed address if it looks like one, otherwise "". */
+export function plausibleEmail(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const email = value.trim();
+  return email.length <= 254 && EMAIL.test(email) ? email : "";
+}
 
 const isKnown = (code: unknown): code is string =>
   typeof code === "string" && languageByCode(code) !== undefined;
@@ -56,7 +73,9 @@ export function sanitiseSettings(raw: unknown): Settings {
     }
   }
 
-  return { learning, native, trigger, hoverDelayMs, spanishVariety, sites };
+  const myMemoryEmail = plausibleEmail(r.myMemoryEmail);
+
+  return { learning, native, trigger, hoverDelayMs, spanishVariety, sites, myMemoryEmail };
 }
 
 export async function loadSettings(): Promise<Settings> {
