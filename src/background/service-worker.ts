@@ -13,6 +13,8 @@ const CONTEXT_MENU_ID = "lekseis-hover-lookup";
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 async function respond(message: WorkerRequest): Promise<LookupResponse | TranslateLanguageResponse> {
+  // Read for each request, so changed languages or a changed or removed
+  // MyMemory email apply at once, without reloading the extension.
   const settings = await loadSettings();
   if (message.type === "translate-language") {
     const result = await lookups.translateLanguage(message.text, message.from, message.lang, settings);
