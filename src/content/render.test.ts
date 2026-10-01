@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { parseKaikki } from "../shared/kaikki";
 import type { ExplainResult, LanguageOutcome, LanguageTranslation, TranslateResult } from "../shared/types";
 import { fixture } from "../test/fixtures";
-import { entriesToShow, renderResult } from "./render";
+import type { Speech } from "../shared/speech";
+import { entriesToShow, renderResult, type RenderOptions } from "./render";
 
 const result = (over: Partial<ExplainResult>): ExplainResult => ({
   kind: "explain",
@@ -15,9 +16,9 @@ const result = (over: Partial<ExplainResult>): ExplainResult => ({
   ...over,
 });
 
-function render(r: ExplainResult) {
+function render(r: ExplainResult, options: RenderOptions = {}, onListen = vi.fn(async (_: Speech) => {})) {
   const root = document.createElement("div");
-  root.append(renderResult(document, r, { onPlayAudio: vi.fn(), loadLanguage: vi.fn(), onChooseLanguage: vi.fn() }));
+  root.append(renderResult(document, r, { onListen, loadLanguage: vi.fn(), onChooseLanguage: vi.fn() }, options));
   return root;
 }
 
@@ -132,7 +133,7 @@ describe("renderResult: translating from the user's language", () => {
     const loadLanguage = vi.fn((lang: string) => new Promise<LanguageOutcome>((resolve) => pending.set(lang, resolve)));
     const onChooseLanguage = vi.fn();
     const root = document.createElement("div");
-    root.append(renderResult(document, translation(languages, over), { onPlayAudio: vi.fn(), loadLanguage, onChooseLanguage }));
+    root.append(renderResult(document, translation(languages, over), { onListen: vi.fn(async () => {}), loadLanguage, onChooseLanguage }));
     document.body.replaceChildren(root);
     const tabs = [...root.querySelectorAll<HTMLElement>("[role=tab]")];
     const panels = [...root.querySelectorAll<HTMLElement>("[role=tabpanel]")];
@@ -363,5 +364,86 @@ describe("renderResult: translating from the user's language", () => {
     const { root } = await renderLoaded([french, { lang: "es", senses: [], machine: evil }]);
     expect(root.querySelector("img")).toBeNull();
     expect(root.textContent).toContain(evil);
+  });
+});
+
+describe("renderResult: listening", () => {
+  const explainResult = (over: Partial<ExplainResult>): ExplainResult => ({
+    kind: "explain",
+    query: "mange",
+    lang: "fr",
+    entries: parseKaikki(fixture("french-mange")),
+    lemmas: parseKaikki(fixture("french-manger")),
+    warnings: [],
+    ...over,
+  });
+  const listenButton = (root: HTMLElement) => root.querySelector<HTMLButtonElement>("button.lh-audio");
+
+  it("plays a native speaker's recording of the selected word, labelled with what it says", () => {
+    const onListen = vi.fn(async (_: Speech) => {});
+    const button = listenButton(render(explainResult({}), {}, onListen))!;
+    expect(button.getAttribute("aria-label")).toBe("Listen to “mange”");
+    button.click();
+    expect(onListen).toHaveBeenCalledWith(expect.objectContaining({ text: "mange", lang: "fr", recording: expect.stringMatching(/^https:\/\/upload\.wikimedia\.org\//) }));
+  });
+
+  it("never plays the lemma's recording for an inflected form, which would say a different word", () => {
+    const withoutOwnRecording = parseKaikki(fixture("french-mange")).map(({ audioUrl: _, ...e }) => e);
+    const onListen = vi.fn(async (_: Speech) => {});
+    const root = render(explainResult({ entries: withoutOwnRecording }), { speechLanguages: new Set(["fr"]) }, onListen);
+    listenButton(root)!.click();
+    expect(onListen).toHaveBeenCalledWith({ text: "mange", lang: "fr" });
+  });
+
+  it("offers a Listen button without a recording only when there's a voice for the language", () => {
+    const comer = explainResult({ query: "comer", lang: "es", entries: parseKaikki(fixture("spanish-comer")), lemmas: [] });
+    expect(listenButton(render(comer))).toBeNull();
+    expect(listenButton(render(comer, { speechLanguages: new Set(["fr"]) }))).toBeNull();
+    expect(listenButton(render(comer, { speechLanguages: new Set(["es"]) }))).not.toBeNull();
+  });
+
+  it("reads a phrase aloud too", () => {
+    const onListen = vi.fn(async (_: Speech) => {});
+    const phrase = explainResult({ query: "je voudrais une pomme", entries: [], lemmas: [] });
+    listenButton(render(phrase, { speechLanguages: new Set(["fr"]) }, onListen))!.click();
+    expect(onListen).toHaveBeenCalledWith({ text: "je voudrais une pomme", lang: "fr" });
+  });
+
+  it("announces why it couldn't be read aloud", async () => {
+    const onListen = vi.fn(async () => { throw new Error("This computer has no Spanish voice to read it aloud."); });
+    const root = render(explainResult({}), {}, onListen);
+    listenButton(root)!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    const status = root.querySelector(".lh-listen-status")!;
+    expect(status.getAttribute("role")).toBe("status");
+    expect(status.textContent).toBe("This computer has no Spanish voice to read it aloud.");
+  });
+
+  function renderFirstLanguage(language: LanguageTranslation, options: RenderOptions = {}) {
+    const onListen = vi.fn(async (_: Speech) => {});
+    const result: TranslateResult = {
+      kind: "translate",
+      query: "eat",
+      lang: "en",
+      languages: [language.lang],
+      first: { lang: language.lang, outcome: { ok: true, result: language } },
+      warnings: [],
+    };
+    const root = document.createElement("div");
+    root.append(renderResult(document, result, { onListen, loadLanguage: vi.fn(), onChooseLanguage: vi.fn() }, options));
+    return { root, onListen };
+  }
+
+  it("says the main translation, with its recording when Wiktionary has one", () => {
+    const manger = parseKaikki(fixture("french-manger")).find((e) => e.pos === "verb")!;
+    const { root, onListen } = renderFirstLanguage({ lang: "fr", senses: [], lead: "manger", entry: manger });
+    listenButton(root)!.click();
+    expect(onListen).toHaveBeenCalledWith(expect.objectContaining({ text: "manger", lang: "fr", recording: manger.audioUrl }));
+  });
+
+  it("says a phrase's machine translation in the language being learned", () => {
+    const { root, onListen } = renderFirstLanguage({ lang: "es", senses: [], machine: "buenos días" }, { speechLanguages: new Set(["es"]) });
+    listenButton(root)!.click();
+    expect(onListen).toHaveBeenCalledWith({ text: "buenos días", lang: "es" });
   });
 });

@@ -176,6 +176,21 @@ try {
   check(/of\s+manger/.test(mange) && mange.includes("to eat"), "French word: form of manger, meaning 'to eat'");
   check(await page.locator("paradigma-popup details[open] mark").first().innerText() === "mange", "French word: marks the selected form");
   await page.screenshot({ path: `${out}/explain-french.png` });
+
+  // Listening: Wiktionary has a recording of "mange", played by an offscreen extension page.
+  const listen = popup().getByRole("button", { name: "Listen to “mange”" });
+  check(await listen.isVisible(), "French word: has a Listen button labelled with the word");
+  await listen.click();
+  const sw = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  let offscreen = 0;
+  for (let i = 0; i < 20 && offscreen === 0; i++) {
+    offscreen = await sw.evaluate(async () =>
+      (await chrome.runtime.getContexts({ contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT] })).length);
+    if (offscreen === 0) await page.waitForTimeout(250);
+  }
+  check(offscreen === 1, "French word: Listen plays the recording from an offscreen extension page, not the website");
+  const voices = await sw.evaluate(async () => (await chrome.tts.getVoices()).filter((v) => !v.remote).length);
+  console.log(`  (this Chromium has ${voices} on-device voice(s); words without recordings use them)`);
   await close();
 
   await doubleClick(page, "#belles");

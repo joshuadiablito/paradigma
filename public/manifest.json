@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Select a word to see it in the languages you're learning, with every conjugation and declension, or to see what it means.",
   "minimum_chrome_version": "128",
-  "permissions": ["storage", "contextMenus"],
+  "permissions": ["storage", "contextMenus", "tts", "offscreen"],
   "host_permissions": ["https://kaikki.org/*", "https://api.mymemory.translated.net/*"],
   "background": { "service_worker": "service-worker.js", "type": "module" },
   "content_scripts": [

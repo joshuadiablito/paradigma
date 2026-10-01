@@ -17,7 +17,9 @@ you're learning, one tab each:
 
 **On a page in a language you're learning**, you see:
 
-- **what it means** in English, with examples, pronunciation and audio;
+- **what it means** in English, with examples and pronunciation;
+- **how it sounds**: **▶ Listen** plays a native speaker's recording when
+  Wiktionary has one, or reads it with one of your computer's own voices;
 - **what form it is**: _mange_ is the "first/third-person singular present
   indicative of _manger_";
 - **all its other forms**:
@@ -51,6 +53,7 @@ default) and tick the languages you're learning.
 | Look up a word                        | Double-click it                                                         |
 | Translate a phrase                    | Drag across it to select it                                             |
 | Switch language                       | Click a tab, or use <kbd>←</kbd> <kbd>→</kbd> when a tab has focus      |
+| Hear it said                          | **▶ Listen**: a recording if Wiktionary has one, else your computer's voice |
 | Look up from the keyboard             | Select text, press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>         |
 | Look up from the mouse menu           | Select text, right-click → **Look up "…"**                              |
 | Keep the popup open to read or scroll | Click inside it; close with <kbd>Escape</kbd>, × or a click elsewhere   |
@@ -262,6 +265,7 @@ Both are free and need no key or account.
 | `src/background/`               | Service worker: translate and explain, MyMemory client, cache, menu    |
 | `src/content/`                  | Page language, the selection, popup and its language tabs              |
 | `src/options/`, `src/action/`   | Settings page and toolbar popup                                        |
+| `src/background/speech.ts`, `src/offscreen/` | Listen: on-device voices via `chrome.tts`, and recordings played from an offscreen extension page |
 | `scripts/`                      | Smoke test, icon rendering, release packaging                          |
 | `test/fixtures/`                | Real kaikki.org responses used by unit tests                           |
 
@@ -314,7 +318,7 @@ Details are in **[PRIVACY.md](PRIVACY.md)**.
 - Definitions are always in English, because they come from English Wiktionary. Your chosen language applies to translations only.
 - Single-word machine translation is often wrong, so a word in a language you're learning is only machine-translated when the dictionary doesn't explain it, and then it's labelled as machine translation.
 - A word split across elements (`<b>ma</b>nger`) is not detected.
-- Some sites' Content-Security-Policy blocks Wikimedia audio. **Listen** then opens the recording in a new tab.
+- Wiktionary has native speakers' recordings mostly for French; other languages are read by your computer's voices. There's no Listen button for a language your computer has no voice for (on a Mac, Māori), since only on-device voices are used, to keep the text private.
 - On touch screens, select the text and use the context menu or the keyboard shortcut; the automatic lookup follows a mouse selection.
 - Translating an English word that has several meanings shows the forms of the most common translation (Wiktionary's, with MyMemory breaking ties); the other meanings' translations are listed above it.
 - Wiktionary's coverage varies by language. Common Greek words have full tables, but rarer ones may have no translation or a stub entry. The popup then shows a machine translation and says that no table is available, rather than guessing.

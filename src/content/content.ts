@@ -3,6 +3,10 @@ import type {
   ContentMessage,
   LookupRequest,
   LookupResponse,
+  SpeakRequest,
+  SpeakResponse,
+  SpeechLanguagesRequest,
+  SpeechLanguagesResponse,
   StatusResponse,
   TranslateLanguageRequest,
   TranslateLanguageResponse,
@@ -18,6 +22,15 @@ const DETECTION_SAMPLE_CHARS = 8000;
 const ORPHANED = "Paradigma was updated. Reload the page to keep using it.";
 
 let settings: Settings;
+/** Languages with an on-device voice. Asked for on the first lookup, not on every page load. */
+let speechLanguages: Promise<ReadonlySet<string>> | undefined;
+
+function loadSpeechLanguages(): Promise<ReadonlySet<string>> {
+  speechLanguages ??= chrome.runtime
+    .sendMessage<SpeechLanguagesRequest, SpeechLanguagesResponse>({ type: "speech-languages" })
+    .then((langs) => new Set(Array.isArray(langs) ? langs : []), () => new Set<string>());
+  return speechLanguages;
+}
 let page: PageLanguage = { lang: null, reason: "no-languages" };
 let detected: string | null | undefined; // undefined: not yet detected
 const popup = new LookupPopup();
@@ -53,12 +66,20 @@ async function lookUp(selected: Selected, lang: string, opts: { focus: boolean }
   popup.showLoading(selected.text, lang, selected.rect, opts);
   let response: LookupResponse;
   try {
-    response = await chrome.runtime.sendMessage<LookupRequest, LookupResponse>({ type: "lookup", text: selected.text, lang });
+    [response] = await Promise.all([
+      chrome.runtime.sendMessage<LookupRequest, LookupResponse>({ type: "lookup", text: selected.text, lang }),
+      loadSpeechLanguages(),
+    ]);
   } catch {
     response = { ok: false, error: ORPHANED };
   }
   if (id !== requestId || !popup.isOpen) return; // a newer lookup has replaced this one
-  if (response.ok) popup.showResult(response.result, popupActions(response.result), { spanishVariety: settings.spanishVariety });
+  if (response.ok) {
+    popup.showResult(response.result, popupActions(response.result), {
+      spanishVariety: settings.spanishVariety,
+      speechLanguages: await loadSpeechLanguages(),
+    });
+  }
   else popup.showError(response.error);
 }
 
@@ -74,6 +95,15 @@ function popupActions(result: LookupResult): PopupActions {
       }
     },
     onChooseLanguage: (lang) => void saveLastLanguage(lang),
+    onListen: async (speech) => {
+      let reply: SpeakResponse;
+      try {
+        reply = await chrome.runtime.sendMessage<SpeakRequest, SpeakResponse>({ type: "speak", ...speech });
+      } catch {
+        reply = { ok: false, error: ORPHANED };
+      }
+      if (!reply.ok) throw new Error(reply.error);
+    },
   };
 }
 

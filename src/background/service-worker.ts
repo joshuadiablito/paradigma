@@ -1,7 +1,15 @@
 import { loadLastLanguage } from "../shared/last-language";
-import type { LookupResponse, LookupSelectionCommand, TranslateLanguageResponse, WorkerRequest } from "../shared/messages";
+import type {
+  LookupResponse,
+  LookupSelectionCommand,
+  SpeakResponse,
+  SpeechLanguagesResponse,
+  TranslateLanguageResponse,
+  WorkerRequest,
+} from "../shared/messages";
 import { loadSettings } from "../shared/settings";
 import { createLookupService } from "./lookup-service";
+import { availableSpeechLanguages, speak } from "./speech";
 
 // Content scripts can't call kaikki.org directly: it sends no CORS headers,
 // and a content script's requests are subject to the page's origin. The
@@ -12,10 +20,19 @@ const CONTEXT_MENU_ID = "paradigma-lookup";
 
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-async function respond(message: WorkerRequest): Promise<LookupResponse | TranslateLanguageResponse> {
+type WorkerResponse = LookupResponse | TranslateLanguageResponse | SpeakResponse | SpeechLanguagesResponse;
+
+const HANDLED = new Set<WorkerRequest["type"]>(["lookup", "translate-language", "speak", "speech-languages"]);
+
+async function respond(message: WorkerRequest): Promise<WorkerResponse> {
+  if (message.type === "speech-languages") return availableSpeechLanguages();
   // Read for each request, so changed languages or a changed or removed
   // MyMemory email apply at once, without reloading the extension.
   const settings = await loadSettings();
+  if (message.type === "speak") {
+    await speak({ text: message.text, lang: message.lang, ...(message.recording ? { recording: message.recording } : {}) }, settings.spanishVariety);
+    return { ok: true };
+  }
   if (message.type === "translate-language") {
     const result = await lookups.translateLanguage(message.text, message.from, message.lang, settings);
     return { ok: true, result };
@@ -25,7 +42,7 @@ async function respond(message: WorkerRequest): Promise<LookupResponse | Transla
 }
 
 chrome.runtime.onMessage.addListener((message: WorkerRequest, _sender, sendResponse) => {
-  if (message?.type !== "lookup" && message?.type !== "translate-language") return false;
+  if (!HANDLED.has(message?.type)) return false;
   respond(message).then(sendResponse, (e: unknown) => sendResponse({ ok: false, error: errorMessage(e) }));
   return true; // keeps the channel open for the async response
 });

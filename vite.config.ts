@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => ({
       input: {
         options: resolve(import.meta.dirname, "src/options/options.html"),
         action: resolve(import.meta.dirname, "src/action/action.html"),
+        offscreen: resolve(import.meta.dirname, "src/offscreen/offscreen.html"),
         "service-worker": resolve(import.meta.dirname, "src/background/service-worker.ts"),
       },
       output: {

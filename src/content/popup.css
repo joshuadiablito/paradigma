@@ -63,7 +63,10 @@ button:hover { border-color: var(--lh-muted); }
 :is(button, summary, a):focus-visible { outline: 2px solid var(--lh-accent); outline-offset: 2px; }
 .lh-close { font-size: 18px; line-height: 1; }
 
-.lh-pronunciation { display: flex; align-items: center; gap: 8px; margin: 4px 0; color: var(--lh-muted); }
+.lh-pronunciation { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0; color: var(--lh-muted); }
+.lh-listen { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lh-listen-status { font-size: 12px; color: var(--lh-warn); }
+.lh-listen-status:empty { display: none; }
 .lh-ipa { color: var(--lh-muted); }
 .lh-translation { margin: 6px 0; font-size: 15px; }
 .lh-label { color: var(--lh-muted); }

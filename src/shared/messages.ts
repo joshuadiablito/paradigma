@@ -1,3 +1,4 @@
+import type { Speech } from "./speech";
 import type { LanguageOutcome, LookupResult } from "./types";
 
 /** Content script → service worker. */
@@ -24,7 +25,21 @@ export interface TranslateLanguageRequest {
 
 export type TranslateLanguageResponse = LanguageOutcome;
 
-export type WorkerRequest = LookupRequest | TranslateLanguageRequest;
+/** Content script → service worker: say this aloud. */
+export interface SpeakRequest extends Speech {
+  type: "speak";
+}
+
+export type SpeakResponse = { ok: true } | { ok: false; error: string };
+
+/** Content script → service worker: which languages can be read aloud on this computer? */
+export interface SpeechLanguagesRequest {
+  type: "speech-languages";
+}
+
+export type SpeechLanguagesResponse = string[];
+
+export type WorkerRequest = LookupRequest | TranslateLanguageRequest | SpeakRequest | SpeechLanguagesRequest;
 
 /** Service worker → content script, when the keyboard shortcut or context menu fires. */
 export interface LookupSelectionCommand {

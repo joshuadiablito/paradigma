@@ -1,13 +1,12 @@
-import type { InflectionOptions } from "../shared/inflections";
 import type { LookupResult } from "../shared/types";
 import { h } from "./dom";
 import popupCss from "./popup.css?inline";
-import { renderResult, type RenderHandlers } from "./render";
+import { renderResult, type RenderHandlers, type RenderOptions } from "./render";
 
 const GAP = 8;
 
 /** What the popup asks of its owner while a translation is shown. */
-export type PopupActions = Pick<RenderHandlers, "loadLanguage" | "onChooseLanguage">;
+export type PopupActions = Pick<RenderHandlers, "loadLanguage" | "onChooseLanguage" | "onListen">;
 
 /**
  * The lookup popup. Selecting text opens it without taking focus, so reading isn't
@@ -100,11 +99,11 @@ export class LookupPopup {
    * `actions.loadLanguage` when their tab is first shown; if the popup has
    * moved on to another lookup by the time one arrives, it is dropped.
    */
-  showResult(result: LookupResult, actions: PopupActions, options: InflectionOptions = {}): void {
+  showResult(result: LookupResult, actions: PopupActions, options: RenderOptions = {}): void {
     const generation = ++this.#generation;
     this.#status.textContent = "";
     this.#body.replaceChildren(renderResult(this.#doc, result, {
-      onPlayAudio: (url) => this.#play(url),
+      onListen: actions.onListen,
       loadLanguage: (lang) => this.#unlessSuperseded(actions.loadLanguage(lang), generation),
       onChooseLanguage: actions.onChooseLanguage,
     }, options));
@@ -135,12 +134,6 @@ export class LookupPopup {
     return new Promise<T>((resolve, reject) => {
       promise.then((value) => current() && resolve(value), (e: unknown) => current() && reject(e));
     });
-  }
-
-  #play(url: string): void {
-    // Some sites' Content-Security-Policy blocks media from Wikimedia; open it instead.
-    const audio = new Audio(url);
-    audio.play().catch(() => window.open(url, "_blank", "noopener"));
   }
 
   /** Below the word if it fits, else above; kept inside the viewport. */

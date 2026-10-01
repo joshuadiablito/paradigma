@@ -56,8 +56,14 @@ in the extension needs it.
 - To remove it, clear the field on the settings page. It's then deleted from
   your settings and no longer sent.
 
-Pronunciation audio, when you press **Listen**, is loaded from Wikimedia
-(upload.wikimedia.org).
+When you press **Listen**:
+
+- If Wiktionary has a native speaker's recording of the word, it's loaded from
+  Wikimedia (upload.wikimedia.org), which receives only the request for that
+  recording.
+- Otherwise the word or phrase is read aloud by a voice built into your
+  computer, through Chrome's text-to-speech. Only on-device voices are used,
+  never online ones, so the text isn't sent anywhere.
 
 ## What stays in your browser
 

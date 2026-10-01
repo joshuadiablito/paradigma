@@ -2,6 +2,7 @@ import { buildInflections, tableContains, type InflectionOptions, type Inflectio
 import { languageByCode } from "../shared/languages";
 import type { Entry, ExplainResult, LanguageOutcome, LanguageTranslation, LookupResult, TranslateResult } from "../shared/types";
 import { isDictionaryCandidate } from "../shared/word";
+import type { Speech } from "../shared/speech";
 import { h } from "./dom";
 
 const SENSES_SHOWN = 4;
@@ -138,8 +139,14 @@ function wiktionaryLink(doc: Document, word: string, lang: string): HTMLElement 
     "Open ", h(doc, "span", { lang }, `“${word}”`), " in Wiktionary");
 }
 
+export interface RenderOptions extends InflectionOptions {
+  /** Languages with an on-device voice, so a Listen button can work without a recording. */
+  speechLanguages?: ReadonlySet<string>;
+}
+
 export interface RenderHandlers {
-  onPlayAudio: (url: string) => void;
+  /** Says something aloud; rejects with a message fit to show the user. */
+  onListen: (speech: Speech) => Promise<void>;
   /** Translates the looked-up text into a language whose tab is shown for the first time. */
   loadLanguage: (lang: string) => Promise<LanguageOutcome>;
   /** The user chose a language's tab, so that the next translation can open on it. */
@@ -157,26 +164,47 @@ export function renderResult(
     : renderTranslate(doc, result, handlers, options);
 }
 
-function audioButton(doc: Document, url: string, handlers: RenderHandlers): HTMLElement {
-  return h(doc, "button", { type: "button", class: "lh-audio", onclick: () => handlers.onPlayAudio(url) }, "▶ Listen");
+/** A recording, or an on-device voice for the language: otherwise a Listen button would only fail. */
+function canListen(speech: Speech, options: RenderOptions): boolean {
+  return speech.recording !== undefined || (options.speechLanguages?.has(speech.lang) ?? false);
+}
+
+function listenControl(doc: Document, speech: Speech, handlers: RenderHandlers): HTMLElement {
+  const status = h(doc, "span", { class: "lh-listen-status", role: "status" });
+  const button = h(doc, "button", {
+    type: "button",
+    class: "lh-audio",
+    "aria-label": `Listen to “${speech.text}”`,
+    onclick: () => {
+      status.textContent = "";
+      handlers.onListen(speech).catch((e: unknown) => {
+        status.textContent = e instanceof Error ? e.message : String(e);
+      });
+    },
+  }, "▶ Listen");
+  return h(doc, "span", { class: "lh-listen" }, button, status);
 }
 
 function renderExplain(
   doc: Document,
   result: ExplainResult,
   handlers: RenderHandlers,
-  options: InflectionOptions,
+  options: RenderOptions,
 ): DocumentFragment {
   const frag = doc.createDocumentFragment();
   const formOf = result.entries.flatMap((e) => e.formOf.map((f) => ({ ...f, pos: e.pos })));
   const shown = entriesToShow(result);
-  const audio = [...result.entries, ...shown].find((e) => e.audioUrl)?.audioUrl;
   const ipa = result.entries.find((e) => e.ipa)?.ipa;
+  // Only a recording of the selected word itself: a lemma's would say a different word ("manger" for "mange").
+  const selected = result.query.toLocaleLowerCase();
+  const recording = result.entries.find((e) => e.audioUrl && e.word.toLocaleLowerCase() === selected)?.audioUrl;
+  const speech: Speech = { text: result.query, lang: result.lang, ...(recording ? { recording } : {}) };
+  const listenable = canListen(speech, options);
 
   const header: (Node | false | undefined)[] = [
-    Boolean(ipa || audio) && h(doc, "div", { class: "lh-pronunciation" },
+    Boolean(ipa || listenable) && h(doc, "div", { class: "lh-pronunciation" },
       ipa && h(doc, "span", { class: "lh-ipa" }, ipa),
-      audio && audioButton(doc, audio, handlers),
+      listenable && listenControl(doc, speech, handlers),
     ),
     formOf.length > 0 && h(doc, "ul", { class: "lh-formof" },
       formOf.map((f) =>
@@ -252,12 +280,17 @@ function renderLanguagePanel(
   t: LanguageTranslation,
   query: string,
   handlers: RenderHandlers,
-  options: InflectionOptions,
+  options: RenderOptions,
 ): Node[] {
   // A phrase's translation is a phrase too, which Wiktionary won't have a page for.
   // Without a lead word there's no single page to point to.
   const linkWord = isDictionaryCandidate(query) && t.lead !== undefined ? t.entry?.word ?? t.lead : undefined;
   const showPos = new Set(t.senses.map((s) => s.pos)).size > 1;
+  // Say the main translation, or the machine translation of a phrase.
+  const sayText = t.lead ?? t.machine;
+  const recording = t.entry && t.entry.word === t.lead ? t.entry.audioUrl : undefined;
+  const speech: Speech | undefined = sayText ? { text: sayText, lang: t.lang, ...(recording ? { recording } : {}) } : undefined;
+  const listenable = speech !== undefined && canListen(speech, options);
   const nodes: (Node | false | undefined)[] = [
     t.machine !== undefined && h(doc, "p", { class: "lh-translation" },
       h(doc, "span", { class: "lh-label" }, t.machineOf ? `Machine translation of “${t.machineOf}”: ` : "Machine translation: "),
@@ -273,9 +306,9 @@ function renderLanguagePanel(
         ),
       ),
     ),
-    t.entry?.audioUrl !== undefined && h(doc, "div", { class: "lh-pronunciation" },
-      t.entry.ipa && h(doc, "span", { class: "lh-ipa" }, t.entry.ipa),
-      audioButton(doc, t.entry.audioUrl, handlers),
+    Boolean(t.entry?.ipa || listenable) && h(doc, "div", { class: "lh-pronunciation" },
+      t.entry?.ipa && h(doc, "span", { class: "lh-ipa" }, t.entry.ipa),
+      listenable && speech && listenControl(doc, speech, handlers),
     ),
     t.entry && renderEntry(doc, t.entry, { query: t.lead ?? t.entry.word, lang: t.lang, sensesShown: 2 }, options),
     t.senses.length === 0 && t.machine === undefined && !t.warning &&
@@ -413,7 +446,7 @@ function renderTranslate(
   doc: Document,
   result: TranslateResult,
   handlers: RenderHandlers,
-  options: InflectionOptions,
+  options: RenderOptions,
 ): DocumentFragment {
   const frag = doc.createDocumentFragment();
   if (result.source) {
