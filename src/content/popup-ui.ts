@@ -2,9 +2,12 @@ import type { InflectionOptions } from "../shared/inflections";
 import type { LookupResult } from "../shared/types";
 import { h } from "./dom";
 import popupCss from "./popup.css?inline";
-import { renderResult } from "./render";
+import { renderResult, type RenderHandlers } from "./render";
 
 const GAP = 8;
+
+/** What the popup asks of its owner while a translation is shown. */
+export type PopupActions = Pick<RenderHandlers, "loadLanguage" | "onChooseLanguage">;
 
 /**
  * The lookup popup. Selecting text opens it without taking focus, so reading isn't
@@ -22,6 +25,8 @@ export class LookupPopup {
   #anchor: DOMRect | null = null;
   #returnFocus: HTMLElement | null = null;
   #query: string | null = null;
+  /** Counts what the popup has shown, so a late answer for an earlier lookup can be recognised. */
+  #generation = 0;
   pinned = false;
 
   constructor(doc: Document = document) {
@@ -81,6 +86,7 @@ export class LookupPopup {
     this.#anchor = anchor;
     this.#title.textContent = query;
     this.#title.setAttribute("lang", lang);
+    this.#generation++;
     this.#status.textContent = "Looking up…";
     this.#body.replaceChildren();
     this.#dialog.hidden = false;
@@ -89,13 +95,24 @@ export class LookupPopup {
     if (opts.focus) this.#dialog.focus({ preventScroll: true });
   }
 
-  showResult(result: LookupResult, options: InflectionOptions = {}): void {
+  /**
+   * Shows a result. A translation's other languages are fetched with
+   * `actions.loadLanguage` when their tab is first shown; if the popup has
+   * moved on to another lookup by the time one arrives, it is dropped.
+   */
+  showResult(result: LookupResult, actions: PopupActions, options: InflectionOptions = {}): void {
+    const generation = ++this.#generation;
     this.#status.textContent = "";
-    this.#body.replaceChildren(renderResult(this.#doc, result, { onPlayAudio: (url) => this.#play(url) }, options));
+    this.#body.replaceChildren(renderResult(this.#doc, result, {
+      onPlayAudio: (url) => this.#play(url),
+      loadLanguage: (lang) => this.#unlessSuperseded(actions.loadLanguage(lang), generation),
+      onChooseLanguage: actions.onChooseLanguage,
+    }, options));
     this.#position();
   }
 
   showError(message: string): void {
+    this.#generation++;
     this.#status.textContent = message;
     this.#body.replaceChildren();
     this.#position();
@@ -103,12 +120,21 @@ export class LookupPopup {
 
   hide(): void {
     if (!this.isOpen) return;
+    this.#generation++;
     const hadFocus = this.host.shadowRoot?.activeElement != null;
     this.#dialog.hidden = true;
     this.#query = null;
     this.pinned = false;
     if (hadFocus) this.#returnFocus?.focus({ preventScroll: true });
     this.#returnFocus = null;
+  }
+
+  /** Settles as `promise` does, or never if the popup has shown something else since, so it renders nothing. */
+  #unlessSuperseded<T>(promise: Promise<T>, generation: number): Promise<T> {
+    const current = () => generation === this.#generation;
+    return new Promise<T>((resolve, reject) => {
+      promise.then((value) => current() && resolve(value), (e: unknown) => current() && reject(e));
+    });
   }
 
   #play(url: string): void {

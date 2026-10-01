@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { parseKaikki } from "../shared/kaikki";
-import type { ExplainResult, LookupResult, TranslateResult } from "../shared/types";
+import type { ExplainResult, LanguageOutcome, LanguageTranslation, TranslateResult } from "../shared/types";
 import { fixture } from "../test/fixtures";
 import { entriesToShow, renderResult } from "./render";
 
@@ -15,9 +15,9 @@ const result = (over: Partial<ExplainResult>): ExplainResult => ({
   ...over,
 });
 
-function render(r: LookupResult) {
+function render(r: ExplainResult) {
   const root = document.createElement("div");
-  root.append(renderResult(document, r, { onPlayAudio: vi.fn() }));
+  root.append(renderResult(document, r, { onPlayAudio: vi.fn(), loadLanguage: vi.fn(), onChooseLanguage: vi.fn() }));
   return root;
 }
 
@@ -102,43 +102,81 @@ describe("renderResult: explaining a word in a language being learned", () => {
 });
 
 describe("renderResult: translating from the user's language", () => {
-  const translation = (over: Partial<TranslateResult> = {}): TranslateResult => ({
+  const french: LanguageTranslation = {
+    lang: "fr",
+    senses: [{ pos: "verb", sense: "to ingest", words: [{ word: "manger", tags: [] }, { word: "bouffer", tags: ["slang"] }] }],
+    lead: "manger",
+    entry: parseKaikki(fixture("french-manger")).find((e) => e.pos === "verb")!,
+  };
+  const spanish: LanguageTranslation = {
+    lang: "es",
+    senses: [{ pos: "verb", sense: "to ingest", words: [{ word: "comer", tags: [] }] }],
+    lead: "comer",
+    entry: parseKaikki(fixture("spanish-comer")).find((e) => e.pos === "verb")!,
+  };
+
+  /** A translate result whose first language comes with it; the rest are served by `loadLanguage`. */
+  const translation = (languages: LanguageTranslation[], over: Partial<TranslateResult> = {}): TranslateResult => ({
     kind: "translate",
     query: "eat",
     lang: "en",
-    languages: [
-      {
-        lang: "fr",
-        senses: [{ pos: "verb", sense: "to ingest", words: [{ word: "manger", tags: [] }, { word: "bouffer", tags: ["slang"] }] }],
-        lead: "manger",
-        entry: parseKaikki(fixture("french-manger")).find((e) => e.pos === "verb")!,
-      },
-      {
-        lang: "es",
-        senses: [{ pos: "verb", sense: "to ingest", words: [{ word: "comer", tags: [] }] }],
-        lead: "comer",
-        entry: parseKaikki(fixture("spanish-comer")).find((e) => e.pos === "verb")!,
-      },
-    ],
+    languages: languages.map((l) => l.lang),
+    ...(languages[0] ? { first: { lang: languages[0].lang, outcome: { ok: true, result: languages[0] } } } : {}),
     warnings: [],
     ...over,
   });
 
+  /** Renders a translation, serving each other language once its load is released. */
+  function renderTranslation(languages: LanguageTranslation[], over: Partial<TranslateResult> = {}) {
+    const pending = new Map<string, (outcome: LanguageOutcome) => void>();
+    const loadLanguage = vi.fn((lang: string) => new Promise<LanguageOutcome>((resolve) => pending.set(lang, resolve)));
+    const onChooseLanguage = vi.fn();
+    const root = document.createElement("div");
+    root.append(renderResult(document, translation(languages, over), { onPlayAudio: vi.fn(), loadLanguage, onChooseLanguage }));
+    document.body.replaceChildren(root);
+    const tabs = [...root.querySelectorAll<HTMLElement>("[role=tab]")];
+    const panels = [...root.querySelectorAll<HTMLElement>("[role=tabpanel]")];
+    /** Answers a language's load, and waits for it to render. */
+    const release = async (lang: string, outcome?: LanguageOutcome) => {
+      pending.get(lang)!(outcome ?? { ok: true, result: languages.find((l) => l.lang === lang)! });
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    return { root, tabs, panels, loadLanguage, onChooseLanguage, release };
+  }
+
+  /** Renders with every language already loaded, by choosing each tab in turn. */
+  async function renderLoaded(languages: LanguageTranslation[], over: Partial<TranslateResult> = {}) {
+    const r = renderTranslation(languages, over);
+    for (const [i, l] of languages.entries()) {
+      if (i === 0) continue;
+      r.tabs[i]!.click();
+      await r.release(l.lang);
+    }
+    return r;
+  }
+
+  const press = (key: string) =>
+    document.querySelector("[role=tablist]")!.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+
   it("gives each language a tab, with the first selected", () => {
-    const root = render(translation());
-    const tabs = [...root.querySelectorAll("[role=tab]")];
+    const { tabs, panels } = renderTranslation([french, spanish]);
     expect(tabs.map((t) => t.textContent)).toEqual(["French", "Spanish"]);
     expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false"]);
-    const panels = [...root.querySelectorAll<HTMLElement>("[role=tabpanel]")];
     expect(panels.map((p) => p.hidden)).toEqual([false, true]);
     expect(panels[0]?.getAttribute("aria-labelledby")).toBe(tabs[0]?.id);
   });
 
+  it("opens on the language the result starts with, keeping the tabs in order", () => {
+    const { tabs, panels, loadLanguage } = renderTranslation([french, spanish], {
+      first: { lang: "es", outcome: { ok: true, result: spanish } },
+    });
+    expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["false", "true"]);
+    expect(panels[1]?.textContent).toContain("comer");
+    expect(loadLanguage).not.toHaveBeenCalled();
+  });
+
   it("moves between tabs with the arrow keys, wrapping around", () => {
-    document.body.replaceChildren(render(translation()));
-    const tabs = [...document.querySelectorAll<HTMLElement>("[role=tab]")];
-    const press = (key: string) =>
-      document.querySelector("[role=tablist]")!.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    const { tabs } = renderTranslation([french, spanish]);
     press("ArrowRight");
     expect(tabs[1]?.getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(tabs[1]);
@@ -147,16 +185,86 @@ describe("renderResult: translating from the user's language", () => {
     expect(tabs[0]?.getAttribute("aria-selected")).toBe("true");
     press("End");
     expect(tabs[1]?.getAttribute("aria-selected")).toBe("true");
+    press("Home");
+    expect(document.activeElement).toBe(tabs[0]);
+  });
+
+  it("loads a language only when its tab is first shown, announcing that it's loading", async () => {
+    const { tabs, panels, loadLanguage, release } = renderTranslation([french, spanish]);
+    expect(loadLanguage).not.toHaveBeenCalled();
+    expect(panels[1]?.textContent).toBe("");
+
+    tabs[1]!.click();
+    expect(loadLanguage.mock.calls).toEqual([["es"]]);
+    const status = panels[1]!.querySelector("[role=status]")!;
+    expect(status.textContent).toBe("Translating into Spanish…");
+
+    await release("es");
+    expect(status.textContent).toBe("");
+    expect(panels[1]?.querySelector(".lh-entry h3")?.textContent).toContain("comer");
+  });
+
+  it("doesn't load a language again when its tab is shown again", async () => {
+    const { tabs, panels, loadLanguage, release } = renderTranslation([french, spanish]);
+    tabs[1]!.click();
+    tabs[1]!.click(); // still loading
+    await release("es");
+    tabs[0]!.click();
+    tabs[1]!.click();
+    press("ArrowLeft");
+    press("ArrowRight");
+    expect(loadLanguage).toHaveBeenCalledTimes(1);
+    expect(panels[1]?.textContent).toContain("comer");
+  });
+
+  it("loads a tab reached with the keyboard, and leaves focus on its tab when it arrives", async () => {
+    const { tabs, panels, loadLanguage, release } = renderTranslation([french, spanish]);
+    tabs[0]!.focus();
+    press("ArrowRight");
+    expect(loadLanguage.mock.calls).toEqual([["es"]]);
+    await release("es");
+    expect(document.activeElement).toBe(tabs[1]);
+    expect(panels[1]?.textContent).toContain("comer");
+  });
+
+  it("shows a language's failure in its panel, and tries again when the tab is chosen again", async () => {
+    const { tabs, panels, loadLanguage, release } = renderTranslation([french, spanish]);
+    tabs[1]!.click();
+    await release("es", { ok: false, error: "Translation unavailable: offline" });
+    expect(panels[1]?.querySelector("[role=status]")?.textContent).toBe("Translation unavailable: offline");
+    expect(panels[0]?.textContent).toContain("manger");
+    tabs[0]!.click();
+    tabs[1]!.click();
+    expect(loadLanguage).toHaveBeenCalledTimes(2);
+    await release("es");
+    expect(panels[1]?.textContent).toContain("comer");
+  });
+
+  it("shows the first language's failure in its panel without loading it again", () => {
+    const { panels, loadLanguage } = renderTranslation([french, spanish], {
+      first: { lang: "fr", outcome: { ok: false, error: "Translation unavailable: offline" } },
+    });
+    expect(panels[0]?.querySelector("[role=status]")?.textContent).toBe("Translation unavailable: offline");
+    expect(loadLanguage).not.toHaveBeenCalled();
+  });
+
+  it("remembers the tab the user chooses, but not the one it opened on", async () => {
+    const { tabs, onChooseLanguage } = renderTranslation([french, spanish]);
+    expect(onChooseLanguage).not.toHaveBeenCalled();
+    tabs[1]!.click();
+    expect(onChooseLanguage).toHaveBeenLastCalledWith("es");
+    press("ArrowLeft");
+    expect(onChooseLanguage).toHaveBeenLastCalledWith("fr");
   });
 
   it("lists translations by meaning, with usage labels, in the target language", () => {
-    const panel = render(translation()).querySelector("[role=tabpanel]")!;
+    const panel = renderTranslation([french, spanish]).panels[0]!;
     expect(panel.querySelector(".lh-tr-senses")?.textContent).toBe("to ingest: manger, bouffer (slang)");
     expect(panel.querySelector(".lh-tr-word strong")?.getAttribute("lang")).toBe("fr");
   });
 
-  it("shows the main translation's conjugation, opening the present with every person", () => {
-    const panel = render(translation()).querySelectorAll("[role=tabpanel]")[1]!;
+  it("shows the main translation's conjugation, opening the present with every person", async () => {
+    const panel = (await renderLoaded([french, spanish])).panels[1]!;
     expect(panel.querySelector(".lh-entry h3")?.textContent).toContain("comer");
     const open = panel.querySelector("details.lh-table[open]")!;
     expect(open.querySelector("summary")?.textContent).toBe("Indicative present");
@@ -164,82 +272,96 @@ describe("renderResult: translating from the user's language", () => {
     expect(open.textContent).toContain("comen");
   });
 
-  it("links each language's word to its own Wiktionary entry", () => {
-    const panels = render(translation()).querySelectorAll("[role=tabpanel]");
+  it("links each language's word to its own Wiktionary entry", async () => {
+    const { panels } = await renderLoaded([french, spanish]);
     expect(panels[0]?.querySelector("a.lh-wikt")?.getAttribute("href")).toBe("https://en.wiktionary.org/wiki/manger#French");
     expect(panels[1]?.querySelector("a.lh-wikt")?.getAttribute("href")).toBe("https://en.wiktionary.org/wiki/comer#Spanish");
   });
 
   it("says when Wiktionary has no entry for the translation, rather than showing nothing", () => {
-    const root = render(translation({ languages: [{ lang: "el", senses: [], machine: "αναδημοσιεύτηκε", lead: "αναδημοσιεύτηκε" }] }));
+    const { root } = renderTranslation([{ lang: "el", senses: [], machine: "αναδημοσιεύτηκε", lead: "αναδημοσιεύτηκε" }]);
     expect(root.textContent).toContain("Wiktionary has no entry for “αναδημοσιεύτηκε”, so its forms can't be shown.");
     expect(root.querySelector("a.lh-wikt")?.getAttribute("href")).toContain("#Greek");
   });
 
   it("says when Wiktionary has the word but no table of its forms", () => {
     const stub = { word: "αναδημοσιεύω", pos: "verb", senses: [{ gloss: "to republish", tags: [] }], forms: [], formOf: [], translations: [] };
-    const root = render(translation({ languages: [{ lang: "el", senses: [], machine: "αναδημοσιεύω", lead: "αναδημοσιεύω", entry: stub }] }));
+    const { root } = renderTranslation([{ lang: "el", senses: [], machine: "αναδημοσιεύω", lead: "αναδημοσιεύω", entry: stub }]);
     expect(root.textContent).toContain("Wiktionary has no table of forms for “αναδημοσιεύω” yet.");
   });
 
   it("names the base form when that is what was machine-translated", () => {
-    const root = render(translation({ query: "republished", languages: [{ lang: "es", senses: [], machine: "republicar", machineOf: "republish" }] }));
+    const { root } = renderTranslation([{ lang: "es", senses: [], machine: "republicar", machineOf: "republish" }], { query: "republished" });
     expect(root.querySelector(".lh-translation")?.textContent).toBe("Machine translation of “republish”: republicar");
   });
 
   it("abbreviates gender, with the full word available", () => {
-    const root = render(translation({
-      query: "house",
-      languages: [{ lang: "fr", senses: [{ pos: "noun", sense: "abode", words: [{ word: "maison", tags: ["feminine"] }] }] }],
-    }));
+    const { root } = renderTranslation(
+      [{ lang: "fr", senses: [{ pos: "noun", sense: "abode", words: [{ word: "maison", tags: ["feminine"] }] }] }],
+      { query: "house" },
+    );
     const abbr = root.querySelector("abbr")!;
     expect(abbr.textContent?.trim()).toBe("f");
     expect(abbr.getAttribute("title")).toBe("feminine");
   });
 
   it("needs no tabs for a single language", () => {
-    const root = render(translation({ languages: [translation().languages[0]!] }));
+    const { root, loadLanguage } = renderTranslation([french]);
     expect(root.querySelector("[role=tablist]")).toBeNull();
     expect(root.textContent).toContain("manger");
+    expect(loadLanguage).not.toHaveBeenCalled();
+  });
+
+  it("asks for the languages being learned when there are none", () => {
+    const { root } = renderTranslation([]);
+    expect(root.textContent).toContain("Choose the languages you're learning in Settings.");
   });
 
   it("labels machine translations of phrases", () => {
-    const root = render(translation({ query: "good morning", languages: [{ lang: "es", senses: [], machine: "buenos días" }] }));
+    const { root } = renderTranslation([{ lang: "es", senses: [], machine: "buenos días" }], { query: "good morning" });
     expect(root.querySelector(".lh-translation")?.textContent).toBe("Machine translation: buenos días");
     expect(root.querySelector("footer")?.textContent).toContain("MyMemory");
   });
 
-  it("doesn't link a phrase or its translations to Wiktionary, and credits only MyMemory", () => {
-    const query = "because the weather was lovely";
-    const root = render(translation({ query, languages: [
+  it("says which word an inflected form comes from", () => {
+    const { root } = renderTranslation([french, spanish], { query: "ate", source: { lemma: "eat", description: "simple past" } });
+    expect(root.querySelector(".lh-formof")?.textContent).toBe("simple past of eat");
+    expect(root.querySelector("footer a")?.getAttribute("href")).toBe("https://en.wiktionary.org/wiki/eat#English");
+  });
+
+  it("doesn't link a phrase or its translations to Wiktionary, and credits only MyMemory", async () => {
+    const { root } = await renderLoaded([
       { lang: "fr", senses: [], machine: "parce qu'il faisait beau" },
       { lang: "es", senses: [], machine: "porque hacía buen tiempo" },
-    ] }));
+    ], { query: "because the weather was lovely" });
     expect(root.querySelector("a")).toBeNull();
     expect(root.textContent).not.toContain("Wiktionary");
     expect(root.querySelector("footer")?.textContent).toBe("Data: MyMemory");
   });
 
   it("doesn't link a language to Wiktionary when it has no lead word", () => {
-    const root = render(translation({ query: "chow", languages: [{ lang: "es", senses: [], machine: "comer algo" }] }));
-    expect(root.querySelector("[role=tabpanel] a, .lh-wikt-row")).toBeNull();
+    const { root } = renderTranslation([{ lang: "es", senses: [], machine: "comer algo" }], { query: "chow" });
+    expect(root.querySelector(".lh-wikt-row")).toBeNull();
     expect(root.querySelector("footer a")?.getAttribute("href")).toBe("https://en.wiktionary.org/wiki/chow#English");
   });
 
   it("credits Wiktionary but not MyMemory when only dictionary translations are shown", () => {
-    const text = render(translation()).querySelector("footer")?.textContent;
-    expect(text).toBe("Open “eat” in Wiktionary · Data: Wiktionary via kaikki.org (CC BY-SA)");
+    const { root } = renderTranslation([french, spanish]);
+    expect(root.querySelector("footer")?.textContent).toBe("Open “eat” in Wiktionary · Data: Wiktionary via kaikki.org (CC BY-SA)");
   });
 
-  it("says which word an inflected form comes from", () => {
-    const root = render(translation({ query: "ate", source: { lemma: "eat", description: "simple past" } }));
-    expect(root.querySelector(".lh-formof")?.textContent).toBe("simple past of eat");
-    expect(root.querySelector("footer a")?.getAttribute("href")).toBe("https://en.wiktionary.org/wiki/eat#English");
+  it("adds a credit when a tab that loads later shows another provider's data", async () => {
+    const { root, tabs, release } = renderTranslation([french, { lang: "es", senses: [], machine: "comer algo" }]);
+    expect(root.querySelector("footer")?.textContent).not.toContain("MyMemory");
+    tabs[1]!.click();
+    await release("es");
+    expect(root.querySelector("footer")?.textContent).toContain("Wiktionary via kaikki.org (CC BY-SA), MyMemory");
   });
 
-  it("shows a language's warning without hiding the others", () => {
-    const [fr] = translation().languages;
-    const root = render(translation({ languages: [fr!, { lang: "es", senses: [], warning: "Translation unavailable: offline" }] }));
-    expect(root.querySelectorAll("[role=tabpanel]")[1]?.textContent).toContain("Translation unavailable: offline");
+  it("renders provider text in a loaded tab as text, never as HTML", async () => {
+    const evil = '<img src=x onerror="alert(1)">';
+    const { root } = await renderLoaded([french, { lang: "es", senses: [], machine: evil }]);
+    expect(root.querySelector("img")).toBeNull();
+    expect(root.textContent).toContain(evil);
   });
 });

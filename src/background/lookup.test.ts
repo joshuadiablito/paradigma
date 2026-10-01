@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { parseKaikki } from "../shared/kaikki";
 import { fixture } from "../test/fixtures";
-import { explain, glossesMention, leadTranslation, limitSenses, machineCandidates, preferMachineChoice, sensesFor, translate } from "./lookup";
+import {
+  explain,
+  firstLanguage,
+  glossesMention,
+  leadTranslation,
+  limitSenses,
+  machineCandidates,
+  preferMachineChoice,
+  sensesFor,
+  translate,
+  translateLanguage,
+  translateSource,
+  uncachedSteps,
+} from "./lookup";
 
 type Route = (url: URL) => Response | undefined;
 
@@ -82,6 +95,14 @@ describe("explain: a word in a language being learned", () => {
   });
 });
 
+/** Translates into every target, as choosing each tab in turn would. */
+async function translateEach(options: { text: string; from: string; targets: string[]; fetchFn: typeof fetch }) {
+  const source = await translateSource(options);
+  const languages = [];
+  for (const lang of options.targets) languages.push(await translateLanguage(source, lang, options.fetchFn));
+  return { source, languages };
+}
+
 describe("translate: a word or phrase in the user's language", () => {
   const words = {
     "English/eat": "english-eat",
@@ -97,8 +118,7 @@ describe("translate: a word or phrase in the user's language", () => {
 
   it("gives each learning language its dictionary translations and the main one's forms", async () => {
     const { fn, requested } = fakeFetch({ words });
-    const result = await translate({ text: "eat", from: "en", targets: ["fr", "es", "el"], fetchFn: fn });
-    expect(result.kind).toBe("translate");
+    const result = await translateEach({ text: "eat", from: "en", targets: ["fr", "es", "el"], fetchFn: fn });
     expect(result.languages.map((l) => [l.lang, l.lead, l.entry?.word, l.entry?.pos])).toEqual([
       ["fr", "manger", "manger", "verb"],
       ["es", "comer", "comer", "verb"],
@@ -112,16 +132,16 @@ describe("translate: a word or phrase in the user's language", () => {
 
   it("follows an inflected English word to its lemma's translations", async () => {
     const { fn } = fakeFetch({ words });
-    const result = await translate({ text: "ate", from: "en", targets: ["es"], fetchFn: fn });
-    expect(result.source).toEqual({ lemma: "eat", description: "simple past" });
+    const result = await translateEach({ text: "ate", from: "en", targets: ["es"], fetchFn: fn });
+    expect(result.source.formOf).toEqual({ lemma: "eat", description: "simple past" });
     expect(result.languages[0]?.lead).toBe("comer");
   });
 
   it("uses a word's own translations, not those of a word it's a rare form of", async () => {
     // Wiktionary lists "book" as a dialect past tense of "bake".
     const { fn } = fakeFetch({ words: { ...words, "English/book": "english-book", "English/bake": "english-bake" } });
-    const result = await translate({ text: "book", from: "en", targets: ["es"], fetchFn: fn });
-    expect(result.source).toBeUndefined();
+    const result = await translateEach({ text: "book", from: "en", targets: ["es"], fetchFn: fn });
+    expect(result.source.formOf).toBeUndefined();
     expect(result.languages[0]?.lead).toBe("libro");
   });
 
@@ -130,7 +150,7 @@ describe("translate: a word or phrase in the user's language", () => {
       words,
       translation: () => Response.json({ responseStatus: 200, responseData: { translatedText: "morfar" } }),
     });
-    const result = await translate({ text: "eat", from: "en", targets: ["es"], fetchFn: fn });
+    const result = await translateEach({ text: "eat", from: "en", targets: ["es"], fetchFn: fn });
     expect(result.languages[0]?.lead).toBe("morfar");
     expect(result.languages[0]?.senses[0]?.words[0]?.word).toBe("morfar");
   });
@@ -141,7 +161,7 @@ describe("translate: a word or phrase in the user's language", () => {
       words: { "English/teacher": "english-teacher", "Spanish/profesor": "spanish-profesor" },
       translation: () => Response.json({ responseStatus: 200, responseData: { translatedText: "profesor" } }),
     });
-    const result = await translate({ text: "teacher", from: "en", targets: ["es"], fetchFn: fn });
+    const result = await translateEach({ text: "teacher", from: "en", targets: ["es"], fetchFn: fn });
     expect(result.languages[0]?.lead).toBe("profesor");
     expect(result.languages[0]?.senses[0]).toMatchObject({ sense: "usual translation", words: [{ word: "profesor" }] });
     expect(result.languages[0]?.senses[1]?.words[0]?.word).toBe("enseñador");
@@ -152,26 +172,26 @@ describe("translate: a word or phrase in the user's language", () => {
       words: { "English/teacher": "english-teacher", "Spanish/comer": "spanish-comer" },
       translation: () => Response.json({ responseStatus: 200, responseData: { translatedText: "comer" } }),
     });
-    const result = await translate({ text: "teacher", from: "en", targets: ["es"], fetchFn: fn });
+    const result = await translateEach({ text: "teacher", from: "en", targets: ["es"], fetchFn: fn });
     expect(result.languages[0]?.lead).toBe("enseñador");
   });
 
   it("translates a verb form through its base verb, not the base word's noun", async () => {
     const { fn } = fakeFetch({ words });
-    const result = await translate({ text: "ate", from: "en", targets: ["es"], fetchFn: fn });
+    const result = await translateEach({ text: "ate", from: "en", targets: ["es"], fetchFn: fn });
     expect(result.languages[0]?.senses[0]?.pos).toBe("verb");
   });
 
   it("shows a noun's gender with its translation", async () => {
     const { fn } = fakeFetch({ words });
-    const result = await translate({ text: "house", from: "en", targets: ["fr"], fetchFn: fn });
+    const result = await translateEach({ text: "house", from: "en", targets: ["fr"], fetchFn: fn });
     expect(result.languages[0]?.senses[0]?.words[0]).toEqual({ word: "maison", tags: ["feminine"] });
     expect(result.languages[0]?.entry?.word).toBe("maison");
   });
 
   it("machine-translates phrases into each language", async () => {
     const { fn, requested } = fakeFetch({ words });
-    const result = await translate({ text: "I would like to eat something", from: "en", targets: ["fr", "es"], fetchFn: fn });
+    const result = await translateEach({ text: "I would like to eat something", from: "en", targets: ["fr", "es"], fetchFn: fn });
     expect(result.languages.map((l) => l.machine)).toEqual(["fr(I would like to eat something)", "es(I would like to eat something)"]);
     expect(result.languages.every((l) => l.senses.length === 0 && !l.entry)).toBe(true);
     expect(requested.some((r) => r.startsWith("English/"))).toBe(false);
@@ -179,7 +199,7 @@ describe("translate: a word or phrase in the user's language", () => {
 
   it("falls back to machine translation for a word the dictionary can't translate, and looks that up", async () => {
     const { fn } = fakeFetch({ words: { "French/manger": "french-manger" }, translation: () => Response.json({ responseStatus: 200, responseData: { translatedText: "manger" } }) });
-    const result = await translate({ text: "chow", from: "en", targets: ["fr"], fetchFn: fn });
+    const result = await translateEach({ text: "chow", from: "en", targets: ["fr"], fetchFn: fn });
     expect(result.languages[0]).toMatchObject({ machine: "manger", lead: "manger" });
     expect(result.languages[0]?.entry?.word).toBe("manger");
   });
@@ -201,7 +221,7 @@ describe("translate: a word or phrase in the user's language", () => {
         matches: [{ translation: "bonito" }, { translation: "comer" }],
       }),
     });
-    const result = await translate({ text: "ate", from: "en", targets: ["it"], fetchFn: fn });
+    const result = await translateEach({ text: "ate", from: "en", targets: ["it"], fetchFn: fn });
     expect(requested).toContain("MyMemory en|it eat");
     expect(result.languages[0]).toMatchObject({ machine: "bonito", machineOf: "eat", lead: "comer" });
     expect(result.languages[0]?.entry?.pos).toBe("verb");
@@ -212,29 +232,98 @@ describe("translate: a word or phrase in the user's language", () => {
       words: { "English/eat": "english-eat" },
       translation: () => Response.json({ responseStatus: 200, responseData: { translatedText: "mangiare" } }),
     });
-    const result = await translate({ text: "eat", from: "en", targets: ["it"], fetchFn: fn });
+    const result = await translateEach({ text: "eat", from: "en", targets: ["it"], fetchFn: fn });
     expect(result.languages[0]).toMatchObject({ machine: "mangiare", lead: "mangiare" });
     expect(result.languages[0]?.entry).toBeUndefined();
   });
 
   it("uses machine translation when the user's language isn't English, which has no translation tables", async () => {
     const { fn, requested } = fakeFetch();
-    const result = await translate({ text: "comer", from: "es", targets: ["fr"], fetchFn: fn });
+    const result = await translateEach({ text: "comer", from: "es", targets: ["fr"], fetchFn: fn });
     expect(result.languages[0]?.machine).toBe("fr(comer)");
     expect(requested).not.toContain("Spanish/comer");
   });
 
   it("reports one language failing without failing the others", async () => {
     const { fn } = fakeFetch({ words: { "English/eat": "english-eat" } });
-    const result = await translate({ text: "eat", from: "en", targets: ["fr", "es"], fetchFn: fn });
+    const result = await translateEach({ text: "eat", from: "en", targets: ["fr", "es"], fetchFn: fn });
     // The dictionary has translations for both, though their own entries aren't available.
     expect(result.languages.map((l) => l.lead)).toEqual(["manger", "comer"]);
     expect(result.languages.every((l) => !l.entry)).toBe(true);
   });
 
-  it("fails when no language could be translated", async () => {
+  it("fails a language when nothing at all could be found for it", async () => {
     const { fn } = fakeFetch({ kaikki: "fail", translation: "fail" });
-    await expect(translate({ text: "eat", from: "en", targets: ["fr"], fetchFn: fn })).rejects.toThrow(/Translation unavailable/);
+    const source = await translateSource({ text: "eat", from: "en", targets: ["fr"], fetchFn: fn });
+    expect(source.warnings).toEqual(["Dictionary unavailable: kaikki.org responded 503"]);
+    await expect(translateLanguage(source, "fr", fn)).rejects.toThrow(/Translation unavailable/);
+  });
+});
+
+describe("translate: only the language shown first is translated up front", () => {
+  const words = {
+    "English/eat": "english-eat",
+    "English/ate": "english-ate",
+    "French/manger": "french-manger",
+    "Spanish/comer": "spanish-comer",
+    "Greek/τρώω": "greek-troo",
+  };
+
+  it("fetches the English entry and the first language only", async () => {
+    const { fn, requested } = fakeFetch({ words });
+    const result = await translate({ text: "eat", from: "en", targets: ["fr", "el", "es"] }, uncachedSteps(fn));
+    expect(result.languages).toEqual(["fr", "el", "es"]);
+    expect(result.first?.lang).toBe("fr");
+    expect(result.first?.outcome).toMatchObject({ ok: true, result: { lang: "fr", lead: "manger" } });
+    expect(requested).toContain("English/eat");
+    expect(requested).toContain("French/manger");
+    expect(requested.filter((r) => r.startsWith("Greek/") || r.startsWith("Spanish/"))).toEqual([]);
+    expect(requested.filter((r) => r.startsWith("MyMemory"))).toEqual(["MyMemory en|fr eat"]);
+  });
+
+  it("translates another language later from the same source, without fetching English again", async () => {
+    const { fn, requested } = fakeFetch({ words });
+    const source = await translateSource({ text: "eat", from: "en", targets: ["fr", "el", "es"], fetchFn: fn });
+    await translateLanguage(source, "fr", fn);
+    requested.length = 0;
+    const spanish = await translateLanguage(source, "es", fn);
+    expect(spanish).toMatchObject({ lang: "es", lead: "comer", entry: { word: "comer" } });
+    expect(requested.some((r) => r.startsWith("English/"))).toBe(false);
+    expect(requested.filter((r) => r.startsWith("French/") || r.startsWith("Greek/"))).toEqual([]);
+    expect(requested.filter((r) => r.startsWith("MyMemory"))).toEqual(["MyMemory en|es eat"]);
+  });
+
+  it("opens on the language last chosen, if it's still being learned", async () => {
+    const { fn, requested } = fakeFetch({ words });
+    const result = await translate({ text: "eat", from: "en", targets: ["fr", "el", "es"], lastChosen: "es" }, uncachedSteps(fn));
+    expect(result.first?.lang).toBe("es");
+    expect(requested.filter((r) => r.startsWith("French/") || r.startsWith("Greek/"))).toEqual([]);
+    expect(firstLanguage(["fr", "es"], "de")).toBe("fr");
+    expect(firstLanguage([], "de")).toBeUndefined();
+  });
+
+  it("keeps the source's description of an inflected word", async () => {
+    const { fn } = fakeFetch({ words });
+    const result = await translate({ text: "ate", from: "en", targets: ["es"] }, uncachedSteps(fn));
+    expect(result.source).toEqual({ lemma: "eat", description: "simple past" });
+  });
+
+  it("puts a first language's failure in its tab when there are others to try", async () => {
+    const { fn } = fakeFetch({ kaikki: "fail", translation: "fail" });
+    const result = await translate({ text: "eat", from: "en", targets: ["fr", "es"] }, uncachedSteps(fn));
+    expect(result.first).toEqual({ lang: "fr", outcome: { ok: false, error: "Translation unavailable: MyMemory responded 500" } });
+    expect(result.warnings).toEqual(["Dictionary unavailable: kaikki.org responded 503"]);
+  });
+
+  it("fails when the only language could not be translated", async () => {
+    const { fn } = fakeFetch({ kaikki: "fail", translation: "fail" });
+    await expect(translate({ text: "eat", from: "en", targets: ["fr"] }, uncachedSteps(fn))).rejects.toThrow(/Translation unavailable/);
+  });
+
+  it("doesn't translate into the user's own language", async () => {
+    const { fn } = fakeFetch({ words });
+    const result = await translate({ text: "eat", from: "en", targets: ["en", "es"] }, uncachedSteps(fn));
+    expect(result.languages).toEqual(["es"]);
   });
 });
 

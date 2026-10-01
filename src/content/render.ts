@@ -1,6 +1,6 @@
 import { buildInflections, tableContains, type InflectionOptions, type InflectionTable } from "../shared/inflections";
 import { languageByCode } from "../shared/languages";
-import type { Entry, ExplainResult, LanguageTranslation, LookupResult, TranslateResult } from "../shared/types";
+import type { Entry, ExplainResult, LanguageOutcome, LanguageTranslation, LookupResult, TranslateResult } from "../shared/types";
 import { isDictionaryCandidate } from "../shared/word";
 import { h } from "./dom";
 
@@ -140,6 +140,10 @@ function wiktionaryLink(doc: Document, word: string, lang: string): HTMLElement 
 
 export interface RenderHandlers {
   onPlayAudio: (url: string) => void;
+  /** Translates the looked-up text into a language whose tab is shown for the first time. */
+  loadLanguage: (lang: string) => Promise<LanguageOutcome>;
+  /** The user chose a language's tab, so that the next translation can open on it. */
+  onChooseLanguage: (lang: string) => void;
 }
 
 export function renderResult(
@@ -291,38 +295,45 @@ let tabsRendered = 0;
 
 /**
  * One tab per language (WAI-ARIA tabs pattern): arrow keys, Home and End move
- * between tabs, and Tab moves into the panel.
+ * between tabs, and Tab moves into the panel. Panels start empty; `onShow`
+ * fills one when its tab is selected, `chosen` saying whether the user did that.
  */
-function renderTabs(doc: Document, panels: { label: string; content: Node[] }[]): HTMLElement {
+function renderTabs(
+  doc: Document,
+  labels: string[],
+  initial: number,
+  onShow: (index: number, panel: HTMLElement, chosen: boolean) => void,
+): HTMLElement {
   const prefix = `lh-tabs-${++tabsRendered}`;
   const tabs: HTMLButtonElement[] = [];
   const panelEls: HTMLElement[] = [];
 
-  const select = (index: number, focus: boolean) => {
+  const select = (index: number, opts: { focus: boolean; chosen: boolean }) => {
     tabs.forEach((tab, i) => {
       const selected = i === index;
       tab.setAttribute("aria-selected", String(selected));
       tab.tabIndex = selected ? 0 : -1;
       panelEls[i]!.hidden = !selected;
     });
-    if (focus) tabs[index]!.focus();
+    if (opts.focus) tabs[index]!.focus();
+    onShow(index, panelEls[index]!, opts.chosen);
   };
 
-  panels.forEach((p, i) => {
+  labels.forEach((label, i) => {
     tabs.push(h(doc, "button", {
       type: "button",
       role: "tab",
       id: `${prefix}-tab-${i}`,
       "aria-controls": `${prefix}-panel-${i}`,
-      onclick: () => select(i, false),
-    }, p.label));
+      onclick: () => select(i, { focus: false, chosen: true }),
+    }, label));
     panelEls.push(h(doc, "div", {
       role: "tabpanel",
       id: `${prefix}-panel-${i}`,
       "aria-labelledby": `${prefix}-tab-${i}`,
       tabindex: "0",
       class: "lh-tabpanel",
-    }, p.content));
+    }));
   });
 
   const tablist = h(doc, "div", {
@@ -335,11 +346,67 @@ function renderTabs(doc: Document, panels: { label: string; content: Node[] }[])
       const next = { ArrowRight: current + 1, ArrowLeft: current - 1, Home: 0, End: tabs.length - 1 }[key];
       if (next === undefined) return;
       e.preventDefault();
-      select((next + tabs.length) % tabs.length, true);
+      select((next + tabs.length) % tabs.length, { focus: true, chosen: true });
     },
   }, tabs);
-  select(0, false);
+  select(initial, { focus: false, chosen: false });
   return h(doc, "div", { class: "lh-tabs" }, tablist, panelEls);
+}
+
+/**
+ * One language's part of a translation, filled in when it's first shown.
+ * Its status region announces loading and failure; once loaded, its content
+ * stays, so showing it again fetches nothing. A failure is retried when the
+ * user next chooses its tab.
+ */
+class LanguageSection {
+  readonly #status: HTMLElement;
+  readonly #body: HTMLElement;
+  #state: "empty" | "loading" | "loaded" | "failed" = "empty";
+
+  constructor(
+    doc: Document,
+    readonly lang: string,
+    readonly name: string,
+    private readonly render: (t: LanguageTranslation) => Node[],
+    private readonly onLoaded: (t: LanguageTranslation) => void,
+  ) {
+    this.#status = h(doc, "div", { class: "lh-status lh-panel-status", role: "status" });
+    this.#body = h(doc, "div", {});
+  }
+
+  /** Puts the section into its container: a tab panel, or the popup itself for a single language. */
+  mount(container: HTMLElement | DocumentFragment): void {
+    if (this.#status.parentNode !== container) container.append(this.#status, this.#body);
+  }
+
+  show(outcome: LanguageOutcome): void {
+    if (outcome.ok) {
+      this.#state = "loaded";
+      this.#setStatus("", false);
+      this.#body.replaceChildren(...this.render(outcome.result));
+      this.onLoaded(outcome.result);
+    } else {
+      this.#state = "failed";
+      this.#setStatus(outcome.error, true);
+      this.#body.replaceChildren();
+    }
+  }
+
+  load(loadLanguage: RenderHandlers["loadLanguage"], opts: { retry: boolean }): void {
+    if (this.#state === "loading" || this.#state === "loaded" || (this.#state === "failed" && !opts.retry)) return;
+    this.#state = "loading";
+    this.#setStatus(`Translating into ${this.name}…`, false);
+    loadLanguage(this.lang).then(
+      (outcome) => this.show(outcome),
+      (e: unknown) => this.show({ ok: false, error: e instanceof Error ? e.message : String(e) }),
+    );
+  }
+
+  #setStatus(text: string, failed: boolean): void {
+    this.#status.textContent = text;
+    this.#status.classList.toggle("lh-failed", failed);
+  }
 }
 
 function renderTranslate(
@@ -356,24 +423,46 @@ function renderTranslate(
     ));
   }
 
-  const panels = result.languages.map((t) => ({
-    label: languageByCode(t.lang)?.name ?? t.lang,
-    content: renderLanguagePanel(doc, t, result.query, handlers, options),
-  }));
-  if (panels.length === 1) frag.append(...panels[0]!.content);
-  else if (panels.length > 1) frag.append(renderTabs(doc, panels));
-  else frag.append(h(doc, "p", { class: "lh-empty" }, "Choose the languages you're learning in Settings."));
+  // Credits follow what's on screen, which grows as tabs load.
+  const link = isDictionaryCandidate(result.query) ? wiktionaryLink(doc, result.source?.lemma ?? result.query, result.lang) : undefined;
+  const end = h(doc, "footer", {});
+  const loaded: LanguageTranslation[] = [];
+  const updateFooter = () => fillFooter(doc, end, link, {
+    wiktionary: Boolean(result.source) || loaded.some(showsDictionary),
+    machine: loaded.some((l) => l.machine !== undefined),
+  });
+
+  const sections = result.languages.map((lang) => new LanguageSection(
+    doc,
+    lang,
+    languageByCode(lang)?.name ?? lang,
+    (t) => renderLanguagePanel(doc, t, result.query, handlers, options),
+    (t) => {
+      loaded.push(t);
+      updateFooter();
+    },
+  ));
+  const firstIndex = Math.max(0, result.languages.findIndex((l) => l === result.first?.lang));
+  if (result.first) sections[firstIndex]?.show(result.first.outcome);
+
+  if (sections.length === 1) {
+    sections[0]!.mount(frag);
+    sections[0]!.load(handlers.loadLanguage, { retry: false });
+  } else if (sections.length > 1) {
+    frag.append(renderTabs(doc, sections.map((s) => s.name), firstIndex, (i, panel, chosen) => {
+      const section = sections[i]!;
+      section.mount(panel);
+      section.load(handlers.loadLanguage, { retry: chosen });
+      if (chosen) handlers.onChooseLanguage(section.lang);
+    }));
+  } else {
+    frag.append(h(doc, "p", { class: "lh-empty" }, "Choose the languages you're learning in Settings."));
+  }
 
   if (result.warnings.length > 0) {
     frag.append(h(doc, "ul", { class: "lh-warnings" }, result.warnings.map((w) => h(doc, "li", {}, w))));
   }
-  const link = isDictionaryCandidate(result.query) ? wiktionaryLink(doc, result.source?.lemma ?? result.query, result.lang) : undefined;
-  const credits = {
-    wiktionary: Boolean(result.source) || result.languages.some(showsDictionary),
-    machine: result.languages.some((l) => l.machine !== undefined),
-  };
-  const end = h(doc, "footer", {});
-  fillFooter(doc, end, link, credits);
+  updateFooter();
   frag.append(end);
   return frag;
 }

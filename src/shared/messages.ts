@@ -1,4 +1,4 @@
-import type { LookupResult } from "./types";
+import type { LanguageOutcome, LookupResult } from "./types";
 
 /** Content script → service worker. */
 export interface LookupRequest {
@@ -8,6 +8,23 @@ export interface LookupRequest {
 }
 
 export type LookupResponse = { ok: true; result: LookupResult } | { ok: false; error: string };
+
+/**
+ * Content script → service worker, when a language's tab is first shown:
+ * translate the text of an earlier "lookup" into that language.
+ */
+export interface TranslateLanguageRequest {
+  type: "translate-language";
+  text: string;
+  /** Language of the text: the user's own, as in the lookup's result. */
+  from: string;
+  /** The language to translate into. */
+  lang: string;
+}
+
+export type TranslateLanguageResponse = LanguageOutcome;
+
+export type WorkerRequest = LookupRequest | TranslateLanguageRequest;
 
 /** Service worker → content script, when the keyboard shortcut or context menu fires. */
 export interface LookupSelectionCommand {

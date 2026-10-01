@@ -1,10 +1,21 @@
-import type { ContentMessage, LookupRequest, LookupResponse, StatusResponse } from "../shared/messages";
+import { saveLastLanguage } from "../shared/last-language";
+import type {
+  ContentMessage,
+  LookupRequest,
+  LookupResponse,
+  StatusResponse,
+  TranslateLanguageRequest,
+  TranslateLanguageResponse,
+} from "../shared/messages";
 import { loadSettings, onSettingsChanged, type Settings } from "../shared/settings";
+import type { LookupResult } from "../shared/types";
 import { resolvePageLanguage, resolveTextLanguage, type PageLanguage } from "./activation";
-import { LookupPopup } from "./popup-ui";
+import { LookupPopup, type PopupActions } from "./popup-ui";
 import { currentSelection, type Selected } from "./selection";
 
 const DETECTION_SAMPLE_CHARS = 8000;
+// Messaging fails when the extension was reloaded or updated: this old content script is orphaned.
+const ORPHANED = "Lekseis Hover was updated. Reload the page to keep using it.";
 
 let settings: Settings;
 let page: PageLanguage = { lang: null, reason: "no-languages" };
@@ -44,12 +55,26 @@ async function lookUp(selected: Selected, lang: string, opts: { focus: boolean }
   try {
     response = await chrome.runtime.sendMessage<LookupRequest, LookupResponse>({ type: "lookup", text: selected.text, lang });
   } catch {
-    // The extension was reloaded or updated; this old content script is orphaned.
-    response = { ok: false, error: "Lekseis Hover was updated. Reload the page to keep using it." };
+    response = { ok: false, error: ORPHANED };
   }
   if (id !== requestId || !popup.isOpen) return; // a newer lookup has replaced this one
-  if (response.ok) popup.showResult(response.result, { spanishVariety: settings.spanishVariety });
+  if (response.ok) popup.showResult(response.result, popupActions(response.result), { spanishVariety: settings.spanishVariety });
   else popup.showError(response.error);
+}
+
+/** How the popup fetches a translation's other languages, and remembers the tab chosen. */
+function popupActions(result: LookupResult): PopupActions {
+  return {
+    loadLanguage: async (lang) => {
+      const request: TranslateLanguageRequest = { type: "translate-language", text: result.query, from: result.lang, lang };
+      try {
+        return await chrome.runtime.sendMessage<TranslateLanguageRequest, TranslateLanguageResponse>(request);
+      } catch {
+        return { ok: false, error: ORPHANED };
+      }
+    },
+    onChooseLanguage: (lang) => void saveLastLanguage(lang),
+  };
 }
 
 /** A selection made with the mouse (a double-clicked word, or a dragged phrase) opens a lookup. */

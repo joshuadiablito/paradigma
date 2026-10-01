@@ -85,14 +85,47 @@ export interface LanguageTranslation {
   warning?: string;
 }
 
-/** Text in the user's language, translated into each language being learned. */
+/** A language's translation, or why it couldn't be made. */
+export type LanguageOutcome = { ok: true; result: LanguageTranslation } | { ok: false; error: string };
+
+/**
+ * The part of translating a selection that every language shares: the
+ * English dictionary entries (with their translation tables) and what they
+ * say about the selection. Each language's translation is made from it.
+ */
+export interface TranslationSource {
+  query: string;
+  /** Language of the text: the user's own. */
+  lang: string;
+  /** The languages whose translations `entries` and `lemmas` keep. */
+  targets: string[];
+  /** Dictionary entries for the text itself, with translations into `targets`. */
+  entries: Entry[];
+  /** Entries for the base words of its ordinary forms ("eat" for "ate"). */
+  lemmas: Entry[];
+  /** When the text is mainly an inflected form: "ate" is the "simple past" of "eat". */
+  formOf?: { lemma: string; description: string };
+  /** The part of speech to prefer among translations: the base word's, for a form. */
+  pos?: string;
+  /** Non-fatal problems, e.g. the dictionary being unreachable. */
+  warnings: string[];
+}
+
+/**
+ * Text in the user's language, to be translated into each language being
+ * learned. Only the first language shown comes with it; the others are
+ * fetched when their tab is chosen, to spare the user's MyMemory allowance.
+ */
 export interface TranslateResult {
   kind: "translate";
   query: string;
   lang: string;
   /** When the query is an inflected form: "ate" is the "simple past" of "eat". */
   source?: { lemma: string; description: string };
-  languages: LanguageTranslation[];
+  /** The languages to translate into, in tab order. */
+  languages: string[];
+  /** The language shown first and its translation; absent when there are no languages. */
+  first?: { lang: string; outcome: LanguageOutcome };
   warnings: string[];
 }
 

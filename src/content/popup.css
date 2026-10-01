@@ -103,6 +103,7 @@ mark { background: var(--lh-mark-bg); color: var(--lh-mark-fg); border-radius: 2
 .lh-other dd { margin: 0; }
 
 .lh-status, .lh-empty { color: var(--lh-muted); }
+.lh-panel-status.lh-failed { color: var(--lh-warn); }
 .lh-warnings { margin: 8px 0 0; padding-inline-start: 18px; color: var(--lh-warn); font-size: 12px; }
 footer { margin-top: 10px; font-size: 12px; color: var(--lh-muted); }
 footer a, .lh-wikt { color: var(--lh-accent); }

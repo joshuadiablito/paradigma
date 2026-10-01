@@ -1,36 +1,30 @@
-import type { LookupRequest, LookupResponse, LookupSelectionCommand } from "../shared/messages";
+import { loadLastLanguage } from "../shared/last-language";
+import type { LookupResponse, LookupSelectionCommand, TranslateLanguageResponse, WorkerRequest } from "../shared/messages";
 import { loadSettings } from "../shared/settings";
-import type { LookupResult } from "../shared/types";
-import { PromiseCache } from "./cache";
-import { explain, translate } from "./lookup";
+import { createLookupService } from "./lookup-service";
 
 // Content scripts can't call kaikki.org directly: it sends no CORS headers,
 // and a content script's requests are subject to the page's origin. The
 // service worker has host permissions, so it does the fetching.
 
-const cache = new PromiseCache<LookupResult>(300);
+const lookups = createLookupService();
 const CONTEXT_MENU_ID = "lekseis-hover-lookup";
 
-chrome.runtime.onMessage.addListener((message: LookupRequest, _sender, sendResponse) => {
-  if (message?.type !== "lookup") return false;
-  void (async () => {
-    try {
-      const { native, learning } = await loadSettings();
-      const text = message.text.trim();
-      // In the user's own language: translate into the languages being learned.
-      // In a language being learned: explain it, with its forms, in the user's language.
-      const key = message.lang === native
-        ? `translate|${native}|${learning.join(",")}|${text}`
-        : `explain|${message.lang}|${native}|${text}`;
-      const result = await cache.get(key, () =>
-        message.lang === native
-          ? translate({ text, from: native, targets: learning })
-          : explain({ text, lang: message.lang, target: native }));
-      sendResponse({ ok: true, result } satisfies LookupResponse);
-    } catch (e) {
-      sendResponse({ ok: false, error: e instanceof Error ? e.message : String(e) } satisfies LookupResponse);
-    }
-  })();
+const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+async function respond(message: WorkerRequest): Promise<LookupResponse | TranslateLanguageResponse> {
+  const settings = await loadSettings();
+  if (message.type === "translate-language") {
+    const result = await lookups.translateLanguage(message.text, message.from, message.lang, settings);
+    return { ok: true, result };
+  }
+  const result = await lookups.lookup(message.text, message.lang, settings, await loadLastLanguage());
+  return { ok: true, result };
+}
+
+chrome.runtime.onMessage.addListener((message: WorkerRequest, _sender, sendResponse) => {
+  if (message?.type !== "lookup" && message?.type !== "translate-language") return false;
+  respond(message).then(sendResponse, (e: unknown) => sendResponse({ ok: false, error: errorMessage(e) }));
   return true; // keeps the channel open for the async response
 });
 

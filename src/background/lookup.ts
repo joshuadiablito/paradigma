@@ -1,6 +1,14 @@
 import { kaikkiUrl, parseKaikki, type ParseOptions } from "../shared/kaikki";
 import { languageByCode } from "../shared/languages";
-import type { Entry, ExplainResult, LanguageTranslation, TranslateResult, TranslationSense } from "../shared/types";
+import type {
+  Entry,
+  ExplainResult,
+  LanguageOutcome,
+  LanguageTranslation,
+  TranslateResult,
+  TranslationSense,
+  TranslationSource,
+} from "../shared/types";
 import { isDictionaryCandidate, lookupCandidates } from "../shared/word";
 import { machineTranslate, translateWithMyMemory, type MachineTranslation } from "./translate";
 
@@ -96,15 +104,6 @@ export async function explain({ text, lang, target, fetchFn = fetch }: ExplainOp
 
 // ── Translate: a word or phrase in the user's language ──────────────────────
 
-export interface TranslateOptions {
-  text: string;
-  /** Language of the text: the user's own. */
-  from: string;
-  /** Languages being learned. */
-  targets: string[];
-  fetchFn?: Fetch;
-}
-
 /**
  * Groups one language's translations by meaning, dropping obsolete and rare
  * words. Keeps them all; `limitSenses` trims for display once the common
@@ -195,13 +194,6 @@ async function bestEntry(candidates: string[], lang: string, pos: string | undef
   return best?.entry;
 }
 
-interface SourceHint {
-  /** The English lemma, when the selection is an inflected form ("republish" for "republished"). */
-  lemma?: string;
-  /** The English word's part of speech, to prefer translations of the same kind. */
-  pos?: string;
-}
-
 /**
  * Picks the common word among dictionary translations. Wiktionary doesn't
  * order translations by frequency ("enseñador" before "profesor"), nor
@@ -224,19 +216,16 @@ export function preferMachineChoice(
   return { senses: [reordered, ...senses.filter((_, i) => i !== index)], lead: { word: word.word, pos: sense.pos } };
 }
 
-async function translateInto(
-  query: string,
-  from: string,
-  lang: string,
-  english: { entries: Entry[]; lemmas: Entry[] },
-  hint: SourceHint,
-  fetchFn: Fetch,
-): Promise<LanguageTranslation> {
+async function translateInto(source: TranslationSource, lang: string, fetchFn: Fetch): Promise<LanguageTranslation> {
+  const { query, lang: from } = source;
+  // The English lemma, when the selection is an inflected form ("republish"
+  // for "republished"), and its part of speech, to prefer translations of the same kind.
+  const hint = { lemma: source.formOf?.lemma, pos: source.pos };
   // A word's own translations and its base word's: "running" is an adjective
   // ("three days running") but mostly a form of "run". The base word's come
   // first when the word is mainly a form of it.
-  const own = sensesFor(english.entries, lang);
-  const base = sensesFor(english.lemmas, lang);
+  const own = sensesFor(source.entries, lang);
+  const base = sensesFor(source.lemmas, lang);
   // The meanings the selection most likely has: for a form, the base word's
   // of the same part of speech ("running" → the verb "run", not the noun).
   const formMeanings = hint.lemma ? base.filter((m) => m.pos === hint.pos) : [];
@@ -277,16 +266,16 @@ async function translateInto(
   // into this language. Machine-translate the base form of a word, as an
   // inflected one ("republished") tends to come back as a form, or a noun, that
   // has no dictionary entry.
-  const source = single && hint.lemma ? hint.lemma : query;
+  const machineOf = single && hint.lemma ? hint.lemma : query;
   let mt: MachineTranslation;
   try {
-    mt = await machineTranslate(source, from, lang, fetchFn);
+    mt = await machineTranslate(machineOf, from, lang, fetchFn);
   } catch (e) {
     result.warning = `Translation unavailable: ${message(e)}`;
     return result;
   }
   result.machine = mt.text;
-  if (source !== query) result.machineOf = source;
+  if (machineOf !== query) result.machineOf = machineOf;
   if (!single) return result;
 
   const candidates = machineCandidates(mt);
@@ -300,13 +289,22 @@ async function translateInto(
   return result;
 }
 
+export interface SourceOptions {
+  text: string;
+  /** Language of the text: the user's own. */
+  from: string;
+  /** Languages being learned, whose translations to keep from the dictionary. */
+  targets: string[];
+  fetchFn?: Fetch;
+}
+
 /**
- * Translates text from the user's language into each language being learned.
- * A word gets Wiktionary's translations by meaning (only English Wiktionary
- * has translation tables, so only from English) and the forms of the main
- * translation; a phrase gets a machine translation.
+ * The part of translating text that every language shares: for an English
+ * word, its Wiktionary entry with translations into each target (only English
+ * Wiktionary has translation tables), and the base word it's a form of.
+ * Phrases and other source languages need no request here.
  */
-export async function translate({ text, from, targets, fetchFn = fetch }: TranslateOptions): Promise<TranslateResult> {
+export async function translateSource({ text, from, targets, fetchFn = fetch }: SourceOptions): Promise<TranslationSource> {
   const query = text.trim();
   const warnings: string[] = [];
   let entries: Entry[] = [];
@@ -330,22 +328,95 @@ export async function translate({ text, from, targets, fetchFn = fetch }: Transl
   const usable = new Set(entries.flatMap((e) => e.formOf)
     .filter((f) => !(f.tags ?? []).some((t) => MARGINAL_FORM.has(t)))
     .map((f) => f.lemma));
-  lemmas = lemmas.filter((l) => usable.has(l.word));
-  const hint: SourceHint = { ...(formOf ? { lemma: formOf.lemma } : {}), ...(pos ? { pos } : {}) };
 
-  const languages = await Promise.all(
-    targets.filter((t) => t !== from).map((lang) => translateInto(query, from, lang, { entries, lemmas }, hint, fetchFn)),
-  );
-  if (languages.length > 0 && languages.every((l) => l.warning && l.senses.length === 0 && !l.machine)) {
-    throw new Error(languages[0]!.warning);
+  return {
+    query,
+    lang: from,
+    targets,
+    entries,
+    lemmas: lemmas.filter((l) => usable.has(l.word)),
+    ...(formOf ? { formOf: { lemma: formOf.lemma, description: formOf.description } } : {}),
+    ...(pos ? { pos } : {}),
+    warnings,
+  };
+}
+
+/**
+ * Translates text into one language being learned, from its shared source: a
+ * word gets the dictionary's translations by meaning and the forms of the
+ * main one; a phrase gets a machine translation. Rejects only when nothing at
+ * all was found, so that a failure is never kept as if it were an answer.
+ */
+export async function translateLanguage(source: TranslationSource, lang: string, fetchFn: Fetch = fetch): Promise<LanguageTranslation> {
+  languageName(lang); // rejects an unsupported language before any request
+  const result = await translateInto(source, lang, fetchFn);
+  if (result.warning !== undefined && result.senses.length === 0 && result.machine === undefined) {
+    throw new Error(result.warning);
+  }
+  return result;
+}
+
+/**
+ * The language whose tab is shown first: the one the user last chose, if
+ * they're still learning it, else the first.
+ */
+export function firstLanguage(languages: string[], lastChosen: string | undefined): string | undefined {
+  return lastChosen !== undefined && languages.includes(lastChosen) ? lastChosen : languages[0];
+}
+
+/** The two steps of a translation, separate so that each can be cached. */
+export interface TranslateSteps {
+  source(text: string, from: string, targets: string[]): Promise<TranslationSource>;
+  language(source: TranslationSource, lang: string): Promise<LanguageTranslation>;
+}
+
+export const uncachedSteps = (fetchFn: Fetch = fetch): TranslateSteps => ({
+  source: (text, from, targets) => translateSource({ text, from, targets, fetchFn }),
+  language: (source, lang) => translateLanguage(source, lang, fetchFn),
+});
+
+export interface TranslateOptions {
+  text: string;
+  /** Language of the text: the user's own. */
+  from: string;
+  /** Languages being learned. */
+  targets: string[];
+  /** The language the user last chose a tab for, if any. */
+  lastChosen?: string | undefined;
+}
+
+/**
+ * Starts translating text from the user's language into the languages being
+ * learned: the shared source, and only the language shown first. The others
+ * are translated when their tab is chosen (`translateLanguage` with the same
+ * source), so a lookup costs one language's requests, not every language's.
+ */
+export async function translate(
+  { text, from, targets, lastChosen }: TranslateOptions,
+  steps: TranslateSteps = uncachedSteps(),
+): Promise<TranslateResult> {
+  const languages = targets.filter((t) => t !== from);
+  const source = await steps.source(text, from, targets);
+  const lang = firstLanguage(languages, lastChosen);
+  let first: TranslateResult["first"];
+  if (lang !== undefined) {
+    const outcome = await steps.language(source, lang).then(
+      (result): LanguageOutcome => ({ ok: true, result }),
+      (e: unknown): LanguageOutcome => ({ ok: false, error: message(e) }),
+    );
+    // With other languages to try, the failure belongs in this one's tab.
+    if (!outcome.ok && languages.length === 1) throw new Error(outcome.error);
+    first = { lang, outcome };
   }
 
   return {
     kind: "translate",
-    query,
+    query: source.query,
     lang: from,
-    ...(formOf ? { source: { lemma: formOf.lemma, description: formOf.description } } : {}),
+    ...(source.formOf ? { source: source.formOf } : {}),
     languages,
-    warnings,
+    ...(first ? { first } : {}),
+    warnings: source.warnings,
   };
 }
+
