@@ -5,6 +5,7 @@ import {
   explain,
   firstLanguage,
   glossesMention,
+  isFromMachineText,
   leadTranslation,
   limitSenses,
   machineCandidates,
@@ -221,10 +222,45 @@ describe("translate: a word or phrase in the user's language", () => {
     expect(result.languages[0]?.entry?.word).toBe("manger");
   });
 
+  it("presents MyMemory's alternative as the usual translation when its entry confirms the meaning, dropping junk machine text", async () => {
+    // Real MyMemory reply for "speak" into Māori: the main text is wrong, and
+    // the right word turns up among the alternatives (in a sentence, with macrons).
+    const { fn, requested } = fakeFetch({
+      words: { "English/speak": "english-speak", "Māori/kōrero": "maori-korero" },
+      translation: () => Response.json({
+        responseStatus: 200,
+        responseData: { translatedText: "kia tu, kia oho, kia mataara" },
+        matches: [{ translation: "kia tu, kia oho, kia mataara" }, { translation: "korero" }, { translation: "Ka kōrero ahau" }],
+      }),
+    });
+    const result = await translateEach({ text: "speak", from: "en", targets: ["mi"], fetchFn: fn });
+    const maori = result.languages[0]!;
+    expect(requested).toContain("MyMemory en|mi speak");
+    expect(maori.machine).toBeUndefined();
+    expect(maori.machineOf).toBeUndefined();
+    expect(maori.senses).toEqual([{ pos: "verb", sense: "usual translation", words: [{ word: "kōrero", tags: [] }] }]);
+    expect(maori.lead).toBe("kōrero");
+    expect(maori.entry?.word).toBe("kōrero");
+  });
+
+  it("keeps showing the machine text when the alternative's entry doesn't confirm the meaning", async () => {
+    const { fn } = fakeFetch({
+      words: { "French/manger": "french-manger" },
+      translation: () => Response.json({
+        responseStatus: 200,
+        responseData: { translatedText: "bouffer un peu de tout" },
+        matches: [{ translation: "manger" }],
+      }),
+    });
+    const result = await translateEach({ text: "chow", from: "en", targets: ["fr"], fetchFn: fn });
+    expect(result.languages[0]).toMatchObject({ machine: "bouffer un peu de tout", lead: "manger", senses: [] });
+  });
+
   it("machine-translates an inflected word's base form, and prefers a candidate of the same part of speech", async () => {
     // The fixture keeps no Italian translations, so Italian falls back to MyMemory.
-    // Its first answer is an adjective; an alternative is the verb. (Spanish
-    // fixtures stand in for Italian entries: only their shape matters here.)
+    // Its first answer is an adjective; an alternative is the verb, whose own
+    // entry confirms it means "eat". (Spanish fixtures stand in for Italian
+    // entries: only their shape matters here.)
     const { fn, requested } = fakeFetch({
       words: {
         "English/ate": "english-ate",
@@ -240,7 +276,8 @@ describe("translate: a word or phrase in the user's language", () => {
     });
     const result = await translateEach({ text: "ate", from: "en", targets: ["it"], fetchFn: fn });
     expect(requested).toContain("MyMemory en|it eat");
-    expect(result.languages[0]).toMatchObject({ machine: "bonito", machineOf: "eat", lead: "comer" });
+    expect(result.languages[0]).toMatchObject({ lead: "comer", senses: [{ sense: "usual translation", words: [{ word: "comer" }] }] });
+    expect(result.languages[0]?.machine).toBeUndefined();
     expect(result.languages[0]?.entry?.pos).toBe("verb");
   });
 
@@ -367,6 +404,13 @@ describe("machineCandidates", () => {
 
   it("drops punctuation", () => {
     expect(machineCandidates({ text: "¡republicar!", alternatives: [] })).toEqual(["republicar"]);
+  });
+
+  it("tells the main translation and its words apart from the alternatives", () => {
+    const mt = { text: "Para αναδημοσίευση.", alternatives: ["kōrero"] };
+    expect(isFromMachineText("para αναδημοσίευση", mt)).toBe(true);
+    expect(isFromMachineText("αναδημοσίευση", mt)).toBe(true);
+    expect(isFromMachineText("kōrero", mt)).toBe(false);
   });
 });
 

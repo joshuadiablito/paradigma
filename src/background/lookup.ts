@@ -185,27 +185,41 @@ function escapeRegExp(s: string): string {
  */
 export function machineCandidates(mt: MachineTranslation): string[] {
   const whole = [mt.text, ...mt.alternatives]
-    .map((t) => t.replace(/[.,;:!?¿¡"«»“”()]/g, "").trim())
+    .map(withoutPunctuation)
     .filter((t) => t && t.split(/\s+/).length <= 3);
   const parts = whole.flatMap((t) => t.split(/\s+/)).filter((w) => [...w].length >= 4);
   return [...new Set([...whole.filter((t) => !/\s/.test(t)), ...parts, ...whole])].slice(0, MAX_MACHINE_CANDIDATES);
 }
 
+const withoutPunctuation = (t: string) => t.replace(/[.,;:!?¿¡"«»“”()]/g, "").trim();
+
+/** Whether a candidate is MyMemory's main translation or one of its words, rather than an alternative. */
+export function isFromMachineText(candidate: string, mt: MachineTranslation): boolean {
+  const main = withoutPunctuation(mt.text).toLocaleLowerCase();
+  const word = candidate.toLocaleLowerCase();
+  return word === main || main.split(/\s+/).includes(word);
+}
+
 /**
  * The most useful dictionary entry among candidate translations: one with the
  * same part of speech as the English word and a table of forms, if any has both.
+ * Also says which candidate it was found under.
  */
 async function bestEntry(candidates: string[], lang: string, pos: string | undefined, fetchFn: Fetch) {
-  let best: { entry: Entry; score: number } | undefined;
-  for (const word of candidates) {
-    const entry = await targetEntry(word, lang, pos, fetchFn).catch(() => undefined);
+  let best: { entry: Entry; candidate: string; score: number } | undefined;
+  for (const candidate of candidates) {
+    const entry = await targetEntry(candidate, lang, pos, fetchFn).catch(() => undefined);
     if (!entry) continue;
     const score = (entry.pos === pos ? 2 : 0) + (entry.forms.length >= 4 ? 1 : 0);
-    if (!best || score > best.score) best = { entry, score };
+    if (!best || score > best.score) best = { entry, candidate, score };
     if (score === 3) break;
   }
-  return best?.entry;
+  return best;
 }
+
+/** A sense presenting a word whose own entry confirms it as the translation. */
+const usualTranslation = (entry: Entry): TranslationSense =>
+  ({ pos: entry.pos, sense: "usual translation", words: [{ word: entry.word, tags: [] }] });
 
 /**
  * Picks the common word among dictionary translations. Wiktionary doesn't
@@ -260,7 +274,7 @@ async function translateInto(source: TranslationSource, lang: string, fetchFn: F
       const entry = await targetEntry(mt.text, lang, hint.pos, fetchFn).catch(() => undefined);
       if (entry && entry.pos === hint.pos && glossesMention(entry, english)) {
         lead = { word: entry.word, pos: entry.pos };
-        senses = [{ pos: entry.pos, sense: "usual translation", words: [{ word: entry.word, tags: [] }] }, ...senses];
+        senses = [usualTranslation(entry), ...senses];
       }
     }
     result.senses = limitSenses(senses);
@@ -292,10 +306,20 @@ async function translateInto(source: TranslationSource, lang: string, fetchFn: F
   if (!single) return result;
 
   const candidates = machineCandidates(mt);
-  const entry = await bestEntry(candidates, lang, hint.pos, fetchFn);
-  if (entry) {
-    result.lead = entry.word;
-    result.entry = entry;
+  const best = await bestEntry(candidates, lang, hint.pos, fetchFn);
+  if (best) {
+    result.lead = best.entry.word;
+    result.entry = best.entry;
+    // MyMemory's main answer can be junk while an alternative is right: "speak"
+    // into Māori gives "kia tu, kia oho, kia mataara", with "kōrero" among the
+    // alternatives. When the word found came from an alternative and its own
+    // entry says it means the English word, present it as the translation and
+    // drop the unrelated machine text.
+    if (!isFromMachineText(best.candidate, mt) && glossesMention(best.entry, machineOf)) {
+      result.senses = [usualTranslation(best.entry)];
+      delete result.machine;
+      delete result.machineOf;
+    }
   } else if (candidates[0]) {
     result.lead = candidates[0];
   }
