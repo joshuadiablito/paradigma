@@ -18,6 +18,12 @@ import { LookupPopup, type PopupActions } from "./popup-ui";
 import { currentSelection, type Selected } from "./selection";
 
 const DETECTION_SAMPLE_CHARS = 8000;
+/** A recording or voice starts within a second or two; longer means something is stuck. */
+const LISTEN_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([promise, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
+}
 // Messaging fails when the extension was reloaded or updated: this old content script is orphaned.
 const ORPHANED = "Paradigma was updated. Reload the page to keep using it.";
 
@@ -98,11 +104,16 @@ function popupActions(result: LookupResult): PopupActions {
     onListen: async (speech) => {
       let reply: SpeakResponse;
       try {
-        reply = await chrome.runtime.sendMessage<SpeakRequest, SpeakResponse>({ type: "speak", ...speech });
+        reply = await withTimeout(
+          chrome.runtime.sendMessage<SpeakRequest, SpeakResponse>({ type: "speak", ...speech }),
+          LISTEN_TIMEOUT_MS,
+          { ok: false, error: "Nothing could be played. Reload the page and try again." },
+        );
       } catch {
         reply = { ok: false, error: ORPHANED };
       }
       if (!reply.ok) throw new Error(reply.error);
+      return reply.spoken;
     },
   };
 }

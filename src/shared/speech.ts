@@ -6,6 +6,9 @@ export interface Speech {
   recording?: string;
 }
 
+/** How something was said: a native speaker's recording, or the computer's own voice. */
+export type Spoken = "recording" | "voice";
+
 /** Recordings come only from Wikimedia, via kaikki.org; nothing else is played. */
 export function isRecordingUrl(url: string): boolean {
   try {

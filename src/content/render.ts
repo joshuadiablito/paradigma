@@ -2,7 +2,7 @@ import { buildInflections, tableContains, type InflectionOptions, type Inflectio
 import { languageByCode } from "../shared/languages";
 import type { Entry, ExplainResult, LanguageOutcome, LanguageTranslation, LookupResult, TranslateResult } from "../shared/types";
 import { isDictionaryCandidate } from "../shared/word";
-import type { Speech } from "../shared/speech";
+import type { Speech, Spoken } from "../shared/speech";
 import { h } from "./dom";
 
 const SENSES_SHOWN = 4;
@@ -145,8 +145,8 @@ export interface RenderOptions extends InflectionOptions {
 }
 
 export interface RenderHandlers {
-  /** Says something aloud; rejects with a message fit to show the user. */
-  onListen: (speech: Speech) => Promise<void>;
+  /** Says something aloud, saying how; rejects with a message fit to show the user. */
+  onListen: (speech: Speech) => Promise<Spoken>;
   /** Translates the looked-up text into a language whose tab is shown for the first time. */
   loadLanguage: (lang: string) => Promise<LanguageOutcome>;
   /** The user chose a language's tab, so that the next translation can open on it. */
@@ -169,17 +169,36 @@ function canListen(speech: Speech, options: RenderOptions): boolean {
   return speech.recording !== undefined || (options.speechLanguages?.has(speech.lang) ?? false);
 }
 
+const SPOKEN_LABELS: Record<Spoken, string> = {
+  recording: "Playing a native speaker's recording.",
+  voice: "Reading it with your computer's voice.",
+};
+
+/**
+ * A Listen button that always says what happened: playing, then how, or why
+ * it couldn't, so a press is never met with silence and no explanation.
+ */
 function listenControl(doc: Document, speech: Speech, handlers: RenderHandlers): HTMLElement {
   const status = h(doc, "span", { class: "lh-listen-status", role: "status" });
+  let clearTimer: ReturnType<typeof setTimeout> | undefined;
+  const show = (text: string, error = false) => {
+    clearTimeout(clearTimer);
+    status.textContent = text;
+    status.classList.toggle("lh-listen-error", error);
+  };
   const button = h(doc, "button", {
     type: "button",
     class: "lh-audio",
     "aria-label": `Listen to “${speech.text}”`,
     onclick: () => {
-      status.textContent = "";
-      handlers.onListen(speech).catch((e: unknown) => {
-        status.textContent = e instanceof Error ? e.message : String(e);
-      });
+      show("Playing…");
+      handlers.onListen(speech).then(
+        (spoken) => {
+          show(SPOKEN_LABELS[spoken]);
+          clearTimer = setTimeout(() => show(""), 4000);
+        },
+        (e: unknown) => show(e instanceof Error ? e.message : String(e), true),
+      );
     },
   }, "▶ Listen");
   return h(doc, "span", { class: "lh-listen" }, button, status);

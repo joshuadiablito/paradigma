@@ -1,4 +1,4 @@
-import type { Speech } from "./speech";
+import type { Speech, Spoken } from "./speech";
 import type { LanguageOutcome, LookupResult } from "./types";
 
 /** Content script → service worker. */
@@ -30,7 +30,7 @@ export interface SpeakRequest extends Speech {
   type: "speak";
 }
 
-export type SpeakResponse = { ok: true } | { ok: false; error: string };
+export type SpeakResponse = { ok: true; spoken: Spoken } | { ok: false; error: string };
 
 /** Content script → service worker: which languages can be read aloud on this computer? */
 export interface SpeechLanguagesRequest {

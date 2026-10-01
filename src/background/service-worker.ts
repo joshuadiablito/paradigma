@@ -30,8 +30,11 @@ async function respond(message: WorkerRequest): Promise<WorkerResponse> {
   // MyMemory email apply at once, without reloading the extension.
   const settings = await loadSettings();
   if (message.type === "speak") {
-    await speak({ text: message.text, lang: message.lang, ...(message.recording ? { recording: message.recording } : {}) }, settings.spanishVariety);
-    return { ok: true };
+    const spoken = await speak(
+      { text: message.text, lang: message.lang, ...(message.recording ? { recording: message.recording } : {}) },
+      settings.spanishVariety,
+    );
+    return { ok: true, spoken };
   }
   if (message.type === "translate-language") {
     const result = await lookups.translateLanguage(message.text, message.from, message.lang, settings);

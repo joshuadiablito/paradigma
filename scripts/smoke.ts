@@ -189,6 +189,10 @@ try {
     if (offscreen === 0) await page.waitForTimeout(250);
   }
   check(offscreen === 1, "French word: Listen plays the recording from an offscreen extension page, not the website");
+  const listenStatus = popup().locator(".lh-listen-status").first();
+  await listenStatus.filter({ hasText: /recording|voice|couldn|Nothing/ }).waitFor({ timeout: 10_000 }).catch(() => {});
+  const heard = (await listenStatus.textContent()) ?? "";
+  check(heard === "Playing a native speaker's recording.", `French word: Listen says what it played (${heard || "nothing"})`);
   const voices = await sw.evaluate(async () => (await chrome.tts.getVoices()).filter((v) => !v.remote).length);
   console.log(`  (this Chromium has ${voices} on-device voice(s); words without recordings use them)`);
   await close();

@@ -70,7 +70,7 @@ describe("LookupPopup", () => {
     function deferredActions() {
       const pending: ((outcome: LanguageOutcome) => void)[] = [];
       const loadLanguage = vi.fn(() => new Promise<LanguageOutcome>((resolve) => pending.push(resolve)));
-      return { actions: { loadLanguage, onChooseLanguage: vi.fn(), onListen: vi.fn(async () => {}) }, loadLanguage, pending };
+      return { actions: { loadLanguage, onChooseLanguage: vi.fn(), onListen: vi.fn(async () => "voice" as const) }, loadLanguage, pending };
     }
     const spanish = (text: string): LanguageOutcome => ({ ok: true, result: { lang: "es", senses: [], machine: text } });
 

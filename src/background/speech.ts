@@ -1,6 +1,6 @@
 import { languageByCode, normaliseLanguageTag } from "../shared/languages";
 import type { SpanishVariety } from "../shared/settings";
-import { isRecordingUrl, type Speech } from "../shared/speech";
+import { isRecordingUrl, type Speech, type Spoken } from "../shared/speech";
 
 /** The parts of `chrome.tts.TtsVoice` that matter here. */
 export interface VoiceInfo {
@@ -96,11 +96,11 @@ function speakWithVoice(text: string, voice: VoiceInfo): Promise<void> {
  * Says something aloud: a native speaker's recording if there is one, else
  * an on-device voice. Rejects with a message fit to show the user.
  */
-export async function speak(speech: Speech, spanishVariety: SpanishVariety): Promise<void> {
+export async function speak(speech: Speech, spanishVariety: SpanishVariety): Promise<Spoken> {
   if (speech.recording && isRecordingUrl(speech.recording)) {
     try {
       await playRecording(speech.recording);
-      return;
+      return "recording";
     } catch {
       // Fall back to a voice below.
     }
@@ -111,6 +111,7 @@ export async function speak(speech: Speech, spanishVariety: SpanishVariety): Pro
     throw new Error(`This computer has no ${name} voice to read it aloud.`);
   }
   await speakWithVoice(speech.text, voice);
+  return "voice";
 }
 
 export async function availableSpeechLanguages(): Promise<string[]> {
