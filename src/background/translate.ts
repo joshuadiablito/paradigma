@@ -1,8 +1,11 @@
 // MyMemory: free machine/memory translation, no key needed.
-// Anonymous use is limited to roughly 5,000 characters a day per IP.
+// Anonymous use is limited to roughly 5,000 characters a day per IP; giving an
+// email address in the `de` parameter raises that to 50,000.
 // https://mymemory.translated.net/doc/spec.php
+// https://mymemory.translated.net/doc/usagelimits.php
 
 export const MYMEMORY_MAX_BYTES = 500;
+const MYMEMORY_HOST = "api.mymemory.translated.net";
 
 export class TranslationError extends Error {}
 
@@ -13,7 +16,7 @@ export async function translateWithMyMemory(
   fetchFn: typeof fetch = fetch,
 ): Promise<string> {
   const q = truncateToBytes(text.trim(), MYMEMORY_MAX_BYTES);
-  const url = new URL("https://api.mymemory.translated.net/get");
+  const url = new URL(`https://${MYMEMORY_HOST}/get`);
   url.searchParams.set("q", q);
   url.searchParams.set("langpair", `${from}|${to}`);
 
@@ -29,12 +32,29 @@ export async function translateWithMyMemory(
   const translated = body.responseData?.translatedText?.trim();
   // Quota and error messages arrive as a "successful" translation in capitals.
   if (body.quotaFinished || translated?.startsWith("MYMEMORY WARNING")) {
-    throw new TranslationError("MyMemory's free daily limit has been reached");
+    throw new TranslationError(
+      "MyMemory's free daily limit has been reached. Adding your email in Lekseis Hover's settings raises it.",
+    );
   }
   if (Number(body.responseStatus) !== 200 || !translated) {
     throw new TranslationError(body.responseDetails || "MyMemory returned no translation");
   }
   return decodeEntities(translated);
+}
+
+/**
+ * Wraps fetch so requests to MyMemory carry the user's email address, which
+ * raises their free daily limit. Other hosts never see the address.
+ */
+export function withMyMemoryEmail(fetchFn: typeof fetch, email: string | undefined): typeof fetch {
+  if (!email) return fetchFn;
+  return ((input: RequestInfo | URL, init?: RequestInit) => {
+    const isRequest = typeof Request !== "undefined" && input instanceof Request;
+    const url = new URL(isRequest ? input.url : String(input));
+    if (url.hostname !== MYMEMORY_HOST) return fetchFn(input, init);
+    url.searchParams.set("de", email);
+    return fetchFn(isRequest ? new Request(url, input) : url, init);
+  }) as typeof fetch;
 }
 
 function truncateToBytes(text: string, max: number): string {
