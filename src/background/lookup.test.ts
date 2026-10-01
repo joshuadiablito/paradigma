@@ -46,13 +46,30 @@ function fakeFetch(opts: { words?: Record<string, string>; translation?: Route |
 }
 
 describe("explain: a word in a language being learned", () => {
-  it("returns the inflected form, its lemma, and a translation into the user's language", async () => {
-    const { fn } = fakeFetch({ words: { "French/mange": "french-mange", "French/manger": "french-manger" } });
+  it("returns the inflected form and its lemma, without machine-translating a word the dictionary explains", async () => {
+    const { fn, requested } = fakeFetch({ words: { "French/mange": "french-mange", "French/manger": "french-manger" } });
     const result = await explain({ text: "mange", lang: "fr", target: "en", fetchFn: fn });
     expect(result.kind).toBe("explain");
     expect(result.entries[0]?.formOf[0]?.lemma).toBe("manger");
     expect(result.lemmas.map((e) => e.pos)).toEqual(["verb", "noun"]);
-    expect(result.translation).toEqual({ text: "en(mange)", provider: "MyMemory" });
+    expect(result.translation).toBeUndefined();
+    expect(requested.some((r) => r.startsWith("MyMemory"))).toBe(false);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("doesn't machine-translate a plural the dictionary explains through its singular", async () => {
+    const { fn, requested } = fakeFetch({ words: { "Māori/tamariki": "maori-tamariki", "Māori/tamaiti": "maori-tamaiti" } });
+    const result = await explain({ text: "tamariki", lang: "mi", target: "en", fetchFn: fn });
+    expect([...result.entries, ...result.lemmas].some((e) => e.senses.length > 0)).toBe(true);
+    expect(result.translation).toBeUndefined();
+    expect(requested.some((r) => r.startsWith("MyMemory"))).toBe(false);
+  });
+
+  it("machine-translates a word the dictionary doesn't have", async () => {
+    const { fn } = fakeFetch();
+    const result = await explain({ text: "mangeouille", lang: "fr", target: "en", fetchFn: fn });
+    expect(result.entries).toEqual([]);
+    expect(result.translation).toEqual({ text: "en(mangeouille)", provider: "MyMemory" });
     expect(result.warnings).toEqual([]);
   });
 
@@ -63,10 +80,10 @@ describe("explain: a word in a language being learned", () => {
     expect(result.entries).not.toHaveLength(0);
   });
 
-  it("still returns the dictionary entry when translation fails", async () => {
-    const { fn } = fakeFetch({ words: { "Spanish/bonito": "spanish-bonito" }, translation: "fail" });
-    const result = await explain({ text: "bonito", lang: "es", target: "en", fetchFn: fn });
-    expect(result.entries.map((e) => e.pos)).toEqual(["adj", "noun"]);
+  it("warns when a word the dictionary lacks can't be machine-translated either", async () => {
+    const { fn } = fakeFetch({ translation: "fail" });
+    const result = await explain({ text: "mangeouille", lang: "fr", target: "en", fetchFn: fn });
+    expect(result.entries).toEqual([]);
     expect(result.translation).toBeUndefined();
     expect(result.warnings).toEqual(["Translation unavailable: MyMemory responded 500"]);
   });

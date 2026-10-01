@@ -55,6 +55,9 @@ function languageName(code: string): string {
   return language.name;
 }
 
+const settle = async <T>(promise: Promise<T>): Promise<PromiseSettledResult<T>> =>
+  (await Promise.allSettled([promise]))[0]!;
+
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 // ── Explain: a word in a language being learned ─────────────────────────────
@@ -68,19 +71,29 @@ export interface ExplainOptions {
   fetchFn?: Fetch;
 }
 
+/** Whether the dictionary found what a word means, itself or through its lemma. */
+const hasMeanings = ({ entries, lemmas }: { entries: Entry[]; lemmas: Entry[] }) =>
+  [...entries, ...lemmas].some((e) => e.senses.length > 0);
+
 /**
- * Looks text up in Wiktionary (via kaikki.org) and translates it with
- * MyMemory, in parallel. Either provider failing leaves a warning; the
- * lookup only fails if both do.
+ * Looks a word up in Wiktionary (via kaikki.org) and, only if that doesn't say
+ * what it means, translates it with MyMemory. Word-level machine translation
+ * is unreliable ("tamariki" → "there is one dog", "mange" → "eaten") and
+ * spends the user's daily allowance, so it is kept for phrases, words the
+ * dictionary lacks, and the dictionary being unreachable. Either provider
+ * failing leaves a warning; the lookup only fails if both do.
  */
 export async function explain({ text, lang, target, fetchFn = fetch }: ExplainOptions): Promise<ExplainResult> {
   const name = languageName(lang);
   const query = text.trim();
 
-  const [dictionary, translation] = await Promise.allSettled([
+  const dictionary = await settle(
     isDictionaryCandidate(query) ? lookUpWord(query, name, fetchFn) : Promise.resolve({ entries: [], lemmas: [] }),
-    lang === target ? Promise.resolve(undefined) : translateWithMyMemory(query, lang, target, fetchFn),
-  ]);
+  );
+  const found = dictionary.status === "fulfilled" && hasMeanings(dictionary.value);
+  const translation = await settle(
+    lang === target || found ? Promise.resolve(undefined) : translateWithMyMemory(query, lang, target, fetchFn),
+  );
 
   const warnings: string[] = [];
   if (dictionary.status === "rejected") warnings.push(`Dictionary unavailable: ${message(dictionary.reason)}`);
