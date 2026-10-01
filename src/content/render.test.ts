@@ -80,6 +80,25 @@ describe("renderResult: explaining a word in a language being learned", () => {
     expect(href).toBe("https://en.wiktionary.org/wiki/manger#French");
     expect(render(result({})).querySelector("footer a")?.textContent).toBe("Open “manger” in Wiktionary");
   });
+
+  it("doesn't link a phrase to Wiktionary, which has no page for it, and credits only the translation", () => {
+    const root = render(result({
+      query: "je voudrais manger une pomme",
+      entries: [],
+      lemmas: [],
+      translation: { text: "I would like to eat an apple", provider: "MyMemory" },
+    }));
+    expect(root.querySelector("a")).toBeNull();
+    expect(root.querySelector("footer")?.textContent).toBe("Data: MyMemory");
+  });
+
+  it("credits Wiktionary only when it showed something", () => {
+    const found = render(result({})).querySelector("footer")?.textContent;
+    expect(found).toContain("Wiktionary via kaikki.org");
+    expect(found).not.toContain("MyMemory");
+    const missing = render(result({ entries: [], lemmas: [], translation: { text: "eats", provider: "MyMemory" } }));
+    expect(missing.querySelector("footer")?.textContent).toBe("Open “mange” in Wiktionary · Data: MyMemory");
+  });
 });
 
 describe("renderResult: translating from the user's language", () => {
@@ -188,6 +207,28 @@ describe("renderResult: translating from the user's language", () => {
     const root = render(translation({ query: "good morning", languages: [{ lang: "es", senses: [], machine: "buenos días" }] }));
     expect(root.querySelector(".lh-translation")?.textContent).toBe("Machine translation: buenos días");
     expect(root.querySelector("footer")?.textContent).toContain("MyMemory");
+  });
+
+  it("doesn't link a phrase or its translations to Wiktionary, and credits only MyMemory", () => {
+    const query = "because the weather was lovely";
+    const root = render(translation({ query, languages: [
+      { lang: "fr", senses: [], machine: "parce qu'il faisait beau" },
+      { lang: "es", senses: [], machine: "porque hacía buen tiempo" },
+    ] }));
+    expect(root.querySelector("a")).toBeNull();
+    expect(root.textContent).not.toContain("Wiktionary");
+    expect(root.querySelector("footer")?.textContent).toBe("Data: MyMemory");
+  });
+
+  it("doesn't link a language to Wiktionary when it has no lead word", () => {
+    const root = render(translation({ query: "chow", languages: [{ lang: "es", senses: [], machine: "comer algo" }] }));
+    expect(root.querySelector("[role=tabpanel] a, .lh-wikt-row")).toBeNull();
+    expect(root.querySelector("footer a")?.getAttribute("href")).toBe("https://en.wiktionary.org/wiki/chow#English");
+  });
+
+  it("credits Wiktionary but not MyMemory when only dictionary translations are shown", () => {
+    const text = render(translation()).querySelector("footer")?.textContent;
+    expect(text).toBe("Open “eat” in Wiktionary · Data: Wiktionary via kaikki.org (CC BY-SA)");
   });
 
   it("says which word an inflected form comes from", () => {

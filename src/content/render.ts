@@ -1,6 +1,7 @@
 import { buildInflections, tableContains, type InflectionOptions, type InflectionTable } from "../shared/inflections";
 import { languageByCode } from "../shared/languages";
 import type { Entry, ExplainResult, LanguageTranslation, LookupResult, TranslateResult } from "../shared/types";
+import { isDictionaryCandidate } from "../shared/word";
 import { h } from "./dom";
 
 const SENSES_SHOWN = 4;
@@ -201,19 +202,30 @@ function renderExplain(
     frag.append(h(doc, "ul", { class: "lh-warnings" }, result.warnings.map((w) => h(doc, "li", {}, w))));
   }
 
-  const linkWord = shown[0]?.word ?? result.query;
-  frag.append(
-    footer(doc, wiktionaryLink(doc, linkWord, result.lang), Boolean(result.translation)),
-  );
+  // Wiktionary has no page for a phrase, so there's nothing to link to.
+  const link = isDictionaryCandidate(result.query) ? wiktionaryLink(doc, shown[0]?.word ?? result.query, result.lang) : undefined;
+  const credits = { wiktionary: shown.length > 0 || formOf.length > 0, machine: Boolean(result.translation) };
+  const end = h(doc, "footer", {});
+  fillFooter(doc, end, link, credits);
+  frag.append(end);
   return frag;
 }
 
-function footer(doc: Document, link: HTMLElement, usedMachineTranslation: boolean): HTMLElement {
-  return h(doc, "footer", {},
-    link,
-    h(doc, "span", {}, " · Data: Wiktionary via kaikki.org (CC BY-SA)"),
-    usedMachineTranslation && h(doc, "span", {}, ", MyMemory"),
-  );
+/** Which providers' data the popup is showing, to credit only those. */
+interface Credits {
+  wiktionary: boolean;
+  machine: boolean;
+}
+
+/** Fills the footer with a Wiktionary link and credits, hiding it when it has neither. */
+function fillFooter(doc: Document, el: HTMLElement, link: HTMLElement | undefined, credits: Credits): void {
+  const sources = [
+    credits.wiktionary && "Wiktionary via kaikki.org (CC BY-SA)",
+    credits.machine && "MyMemory",
+  ].filter((s): s is string => Boolean(s));
+  const data = sources.length > 0 && h(doc, "span", {}, `${link ? " · " : ""}Data: ${sources.join(", ")}`);
+  el.replaceChildren(...[link, data].filter((n): n is HTMLElement => Boolean(n)));
+  el.hidden = !link && !data;
 }
 
 // ── Translate view ───────────────────────────────────────────────────────────
@@ -234,9 +246,13 @@ function translationWord(doc: Document, w: LanguageTranslation["senses"][number]
 function renderLanguagePanel(
   doc: Document,
   t: LanguageTranslation,
+  query: string,
   handlers: RenderHandlers,
   options: InflectionOptions,
 ): Node[] {
+  // A phrase's translation is a phrase too, which Wiktionary won't have a page for.
+  // Without a lead word there's no single page to point to.
+  const linkWord = isDictionaryCandidate(query) && t.lead !== undefined ? t.entry?.word ?? t.lead : undefined;
   const showPos = new Set(t.senses.map((s) => s.pos)).size > 1;
   const nodes: (Node | false | undefined)[] = [
     t.machine !== undefined && h(doc, "p", { class: "lh-translation" },
@@ -262,11 +278,14 @@ function renderLanguagePanel(
       h(doc, "p", { class: "lh-empty" }, "No translation found."),
     t.lead !== undefined && !t.entry && !t.warning &&
       h(doc, "p", { class: "lh-empty" }, "Wiktionary has no entry for ", h(doc, "span", { lang: t.lang }, `“${t.lead}”`), ", so its forms can't be shown."),
-    t.lead !== undefined && h(doc, "p", { class: "lh-wikt-row" }, wiktionaryLink(doc, t.entry?.word ?? t.lead, t.lang)),
+    linkWord !== undefined && h(doc, "p", { class: "lh-wikt-row" }, wiktionaryLink(doc, linkWord, t.lang)),
     t.warning !== undefined && h(doc, "ul", { class: "lh-warnings" }, h(doc, "li", {}, t.warning)),
   ];
   return nodes.filter((n): n is Node => Boolean(n));
 }
+
+/** Whether a language's panel shows anything from Wiktionary. */
+const showsDictionary = (t: LanguageTranslation) => t.senses.length > 0 || t.entry !== undefined;
 
 let tabsRendered = 0;
 
@@ -339,7 +358,7 @@ function renderTranslate(
 
   const panels = result.languages.map((t) => ({
     label: languageByCode(t.lang)?.name ?? t.lang,
-    content: renderLanguagePanel(doc, t, handlers, options),
+    content: renderLanguagePanel(doc, t, result.query, handlers, options),
   }));
   if (panels.length === 1) frag.append(...panels[0]!.content);
   else if (panels.length > 1) frag.append(renderTabs(doc, panels));
@@ -348,7 +367,13 @@ function renderTranslate(
   if (result.warnings.length > 0) {
     frag.append(h(doc, "ul", { class: "lh-warnings" }, result.warnings.map((w) => h(doc, "li", {}, w))));
   }
-  const usedMachine = result.languages.some((l) => l.machine !== undefined);
-  frag.append(footer(doc, wiktionaryLink(doc, result.source?.lemma ?? result.query, result.lang), usedMachine));
+  const link = isDictionaryCandidate(result.query) ? wiktionaryLink(doc, result.source?.lemma ?? result.query, result.lang) : undefined;
+  const credits = {
+    wiktionary: Boolean(result.source) || result.languages.some(showsDictionary),
+    machine: result.languages.some((l) => l.machine !== undefined),
+  };
+  const end = h(doc, "footer", {});
+  fillFooter(doc, end, link, credits);
+  frag.append(end);
   return frag;
 }
