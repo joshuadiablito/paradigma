@@ -55,6 +55,7 @@ default) and tick the languages you're learning.
 | Select text without a lookup          | Settings → only look up while holding <kbd>Alt</kbd>                    |
 | Force a site on or off                | Toolbar button → choose a rule for the site                             |
 | Translate more each day               | Settings → **Translation limit** → enter your email (optional)          |
+| Forget recent lookups                 | Settings → **Saved lookups** → **Clear saved lookups**                  |
 
 The page's `lang` attribute, or Chrome's language detection, decides which
 way a lookup goes. Text in your language is translated into the languages
@@ -167,6 +168,9 @@ popup says "Lekseis Hover was updated. Reload the page." until you do.
 - **Settings:** in the service worker console, run
   `await chrome.storage.sync.get(null)` to see what's stored, or
   `chrome.storage.sync.clear()` to start over.
+- **Saved lookups:** `await chrome.storage.local.get(null)` shows them, under
+  keys starting `lookup:` (`lookup:index` lists them). **Clear saved
+  lookups** on the settings page removes them.
 
 ### Scripts
 
@@ -198,7 +202,10 @@ page ──select──▶ content script ──message──▶ service worker 
     your language. It reads the English word's Wiktionary translation table,
     picks the main translation per language (preferring one with no regional
     or slang label), and fetches that word's own entry for its forms.
-    Phrases, and words with no dictionary translation, go to MyMemory.
+    Phrases, and words with no dictionary translation, go to MyMemory. When
+    MyMemory's main answer for a word is wrong but one of its alternatives
+    has a dictionary entry confirming the meaning (_speak_ → Māori _kōrero_),
+    that word is shown as the usual translation instead.
     Languages are translated on demand, one tab at a time: a lookup fetches
     the English entry (`translateSource()`) and only the language whose tab
     opens first, which is the one you last chose. Other tabs ask the service
@@ -206,13 +213,20 @@ page ──select──▶ content script ──message──▶ service worker 
     reusing the English entry already fetched, so a lookup spends one
     language's share of your MyMemory allowance, not every language's.
   - **explain** (`explain()`) is for text in a language you're learning. It
-    fetches the word's entry, follows an inflected form to its lemma
-    (_mange_ → _manger_), and machine-translates the text into your language.
+    fetches the word's entry and follows an inflected form to its lemma
+    (_mange_ → _manger_). Only phrases, and words the dictionary doesn't
+    explain (or can't be reached for), are machine-translated, since
+    single-word machine translation is unreliable and spends your allowance.
 
-  Results are cached in memory, the shared English entry and each language
-  separately. Fetching happens in the service worker because
-  kaikki.org sends no CORS headers, and only the extension's host permissions
-  get around that.
+  Results are cached in memory and saved in `chrome.storage.local`
+  (`src/shared/saved-lookups.ts`), the shared English entry and each language
+  separately, so they outlive Chrome stopping the idle service worker: memory
+  first, then storage, then the network. Saved results expire after 30 days
+  and are kept within about 5 MB, least recently used out first. A result
+  made while a provider failed or was over its limit, or carrying a warning,
+  is never saved, so an outage isn't remembered. Fetching happens in the
+  service worker because kaikki.org sends no CORS headers, and only the
+  extension's host permissions get around that.
 - **Inflection tables** are built from Wiktionary's tagged forms
   (`src/shared/inflections.ts`). Person or case goes down the side, gender and
   number across the top, with one table per tense, mood or declension type.
@@ -242,6 +256,7 @@ Both are free and need no key or account.
 | `src/shared/inflections.ts`     | Pivots tagged forms into tables                                        |
 | `src/shared/word.ts`            | Word segmentation and spellings to try (case, elision)                 |
 | `src/shared/settings.ts`        | Settings shape, defaults and validation (`chrome.storage.sync`)        |
+| `src/shared/saved-lookups.ts`   | Saved lookups in `chrome.storage.local`: expiry, size budget, eviction |
 | `src/background/`               | Service worker: translate and explain, MyMemory client, cache, menu    |
 | `src/content/`                  | Page language, the selection, popup and its language tabs              |
 | `src/options/`, `src/action/`   | Settings page and toolbar popup                                        |
@@ -282,14 +297,15 @@ first submission, the store listing, the privacy answers and updates.
 
 See **[PRIVACY.md](PRIVACY.md)**. In short: the text you look up is sent to
 kaikki.org and MyMemory to be looked up. If you enter an email address for a
-higher translation limit, it's sent to MyMemory only. Nothing else leaves your
-browser, and there is no analytics or account.
+higher translation limit, it's sent to MyMemory only. Recent lookups are saved
+in your browser for up to 30 days and never sent anywhere. Nothing else leaves
+your browser, and there is no analytics or account.
 
 ## Known limitations
 
 - Compound tenses (_passé composé_ and similar) are not shown; Wiktionary lists them only as "avoir + past participle".
 - Definitions are always in English, because they come from English Wiktionary. Your chosen language applies to translations only.
-- Single-word machine translation is often wrong, so it's labelled as machine translation and shown after the dictionary's analysis.
+- Single-word machine translation is often wrong, so a word in a language you're learning is only machine-translated when the dictionary doesn't explain it, and then it's labelled as machine translation.
 - A word split across elements (`<b>ma</b>nger`) is not detected.
 - Some sites' Content-Security-Policy blocks Wikimedia audio. **Listen** then opens the recording in a new tab.
 - On touch screens, select the text and use the context menu or the keyboard shortcut; the automatic lookup follows a mouse selection.
