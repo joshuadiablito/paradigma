@@ -295,11 +295,16 @@ first submission, the store listing, the privacy answers and updates.
 
 ## Privacy
 
-See **[PRIVACY.md](PRIVACY.md)**. In short: the text you look up is sent to
-kaikki.org and MyMemory to be looked up. If you enter an email address for a
-higher translation limit, it's sent to MyMemory only. Recent lookups are saved
-in your browser for up to 30 days and never sent anywhere. Nothing else leaves
-your browser, and there is no analytics or account.
+**There is no Lekseis Hover server, and the developer collects nothing.**
+Everything runs in your browser. Your settings and recent lookups stay in your
+browser's own storage, and you can clear them from the settings page. The only
+thing that leaves your browser is what you choose to look up, and it goes
+straight from your browser to the two free services that answer it:
+kaikki.org (dictionary) and MyMemory (machine translation). If you enter an
+email address for a higher translation limit, it goes to MyMemory only. There
+is no analytics, tracking, advertising or account.
+
+Details are in **[PRIVACY.md](PRIVACY.md)**.
 
 ## Known limitations
 

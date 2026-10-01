@@ -139,9 +139,14 @@ git push origin v0.1.0
 > • Keyboard shortcut, and usable with a screen reader
 >
 > 24 languages, including French, Spanish, German, Italian, Portuguese, Greek, Māori,
-> Dutch, Russian, Polish and Japanese. Free, with no account, no tracking and
-> no ads. Dictionary data: Wiktionary via kaikki.org (CC BY-SA). Translation:
-> MyMemory.
+> Dutch, Russian, Polish and Japanese.
+>
+> Private by design: there is no Lekseis Hover server, and we collect nothing.
+> Your settings and recent lookups stay in your browser. Only the words you
+> choose to look up are sent, straight from your browser, to the free services
+> that answer them. No account, no tracking, no ads.
+>
+> Dictionary data: Wiktionary via kaikki.org (CC BY-SA). Translation: MyMemory.
 
 ## Privacy practices answers
 
