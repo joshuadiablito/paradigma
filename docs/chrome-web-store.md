@@ -39,8 +39,8 @@ time.
 | Screenshots (1–5)  | 1280 × 800 PNG or JPEG | `bun run build && bun run smoke` writes them to `smoke-output/` |
 | Small promo tile   | 440 × 280 PNG or JPEG  | Not made yet; the dashboard shows whether it's required         |
 
-The smoke test's screenshots of the French verb, adjective, Greek and Spanish
-lookups are the right size. They show the test page, so for a nicer listing,
+The smoke test's screenshots (English word in French and Spanish, an English
+phrase, French and Greek words) are the right size. They show the test page, so for a nicer listing,
 take screenshots on a real site at the same size.
 
 ## Releasing a version
@@ -63,7 +63,7 @@ bun run build && bun run smoke
 
 Then load `dist/` unpacked (see the README) and check by hand:
 
-- hover over words on a real site in each language you changed;
+- double-click words and select phrases on a real English site, and on a site in each language you changed;
 - the keyboard shortcut and Escape;
 - the settings page and toolbar popup;
 - a site in a language you're *not* learning, where nothing should happen.
@@ -120,17 +120,22 @@ git push origin v0.1.0
 
 **Description** (edit as you like):
 
-> Learning a language by reading? Rest the pointer on any word on a page in the
-> language you're learning to see what it means and every form it takes.
+> Learning a language? Double-click any word as you read.
+>
+> On an English page, see it in every language you're learning, one tab each:
+> dictionary translations by meaning, with gender and usage, and every form of
+> the main translation. Select a phrase to translate it into each language.
+>
+> On a page in a language you're learning, see what a word means in English
+> and every form it takes.
 >
 > • Meanings with examples, pronunciation and audio, from Wiktionary
 > • Which form you're looking at: "mange is the present tense of manger"
 > • Full conjugation tables by person and number, with pronouns
 > • Adjectives by gender, number and case; nouns by number and case
-> • Select a phrase to translate it
 > • Spanish tables for Spain, Latin America or Río de la Plata (vos)
 > • Greek tenses named by aspect: present, aorist, dependent, futures
-> • Works only on pages in your languages; turn it on or off per site
+> • Nothing happens until you select something; turn it off per site
 > • Keyboard shortcut, and usable with a screen reader
 >
 > 23 languages, including French, Spanish, German, Italian, Portuguese, Greek,
@@ -142,18 +147,20 @@ git push origin v0.1.0
 
 **Single purpose:**
 
-> Shows the meaning and grammatical forms (conjugations, declensions) of words
-> the user points at or selects on web pages in languages they are learning.
+> Shows words the user selects on web pages in the languages they are learning:
+> translations with their grammatical forms (conjugations, declensions) for
+> text in the user's own language, and meanings and forms for text in a
+> language being learned.
 
 **Permission justifications:**
 
 | Permission                           | Justification                                                                                                                                                                                                   |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `storage`                            | Saves the user's settings: the languages they're learning, translation language, how lookups are triggered, and per-site on/off rules.                                                                         |
-| `contextMenus`                       | Adds "Look up …" to the right-click menu for selected text, so lookups work without hovering.                                                                                                                   |
+| `contextMenus`                       | Adds "Look up …" to the right-click menu for selected text, for touch screens and for when automatic lookups are set to need Alt.                                                                              |
 | Host `https://kaikki.org/*`          | Fetches the dictionary entry (meanings, pronunciation and inflection tables) for the word the user looks up.                                                                                                   |
 | Host `https://api.mymemory.translated.net/*` | Fetches a translation of the word or phrase the user looks up.                                                                                                                                        |
-| Content script on `http://*/*`, `https://*/*` | Language learners read any site, so the extension must be able to find the word under the pointer and show its popup on any page. It stays idle on pages not in a language the user is learning, and sends nothing but the looked-up text. |
+| Content script on `http://*/*`, `https://*/*` | Language learners read any site, so the extension must be able to see what the user selects and show its popup on any page. It does nothing until the user selects text, and sends nothing but the selected text. |
 
 **Remote code:** No. All code is in the package; kaikki.org and MyMemory
 return data (JSON), which is displayed as text and never executed.

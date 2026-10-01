@@ -1,5 +1,6 @@
-// End-to-end smoke test: loads dist/ into Chromium, serves a French page,
-// hovers over words and checks the popup, against the real kaikki.org and
+// End-to-end smoke test: loads dist/ into Chromium, serves an English page
+// with French, Greek and Spanish passages, selects words and phrases the way a
+// person would, and checks the popup, against the real kaikki.org and
 // MyMemory APIs. Screenshots go to smoke-output/.
 //
 //   bun run build && bun run smoke
@@ -13,14 +14,14 @@ const dist = resolve(root, "dist");
 const out = resolve(root, "smoke-output");
 mkdirSync(out, { recursive: true });
 
-const PAGE = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Test</title>
+const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Test</title>
 <style>body{font:22px/2 Georgia,serif;max-width:40rem;margin:3rem auto}</style></head><body>
-<p id="p1">Le matin, je <span id="mange">mange</span> une pomme avec du pain.</p>
-<p id="p2">Les maisons du village sont très <span id="belles">belles</span> en été.</p>
-<p id="p3" lang="en">This English <span id="english">sentence</span> is ignored.</p>
-<p id="p4">Nous <span id="phrase">prenons le petit-déjeuner</span> ensemble.</p>
+<p>Every morning we <span id="eat">eat</span> breakfast in the old <span id="house">house</span>.</p>
+<p>Yesterday they <span id="ate">ate</span> outside, <span id="phrase">because the weather was lovely</span>.</p>
+<p lang="fr">Le matin, je <span id="mange">mange</span> une pomme. Les maisons sont <span id="belles">belles</span>.</p>
 <p lang="el">Χθες <span id="egrapsa">έγραψα</span> ένα γράμμα.</p>
 <p lang="es">Ellos <span id="comen">comen</span> pan todos los días.</p>
+<p lang="de">Dieser Satz ist auf <span id="german">Deutsch</span>.</p>
 </body></html>`;
 
 const server = Bun.serve({ port: 0, fetch: () => new Response(PAGE, { headers: { "content-type": "text/html; charset=utf-8" } }) });
@@ -41,7 +42,8 @@ const check = (ok: boolean, what: string) => {
 
 try {
   const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
-  await worker.evaluate(() => chrome.storage.sync.set({ learning: ["fr", "el", "es"], native: "en", hoverDelayMs: 150, spanishVariety: "latin-america" }));
+  await worker.evaluate(() =>
+    chrome.storage.sync.set({ learning: ["fr", "el", "es"], native: "en", spanishVariety: "latin-america" }));
   // Close the settings tab that opens on first install.
   for (const p of context.pages()) if (p.url().startsWith("chrome-extension://")) await p.close();
 
@@ -49,74 +51,102 @@ try {
   await page.goto(url);
   await page.waitForTimeout(500);
 
-  const popupText = () => page.locator("lekseis-hover-popup .lh-dialog");
-  const hover = async (p: Page, selector: string) => {
+  const popup = () => page.locator("lekseis-hover-popup .lh-dialog");
+  const popupText = () => popup().evaluate((el) => el.textContent ?? "");
+  const close = () => page.keyboard.press("Escape");
+  const doubleClick = (p: Page, selector: string) => p.locator(selector).dblclick();
+  const drag = async (p: Page, selector: string) => {
     const box = (await p.locator(selector).boundingBox())!;
-    await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+    await p.mouse.move(box.x + 1, box.y + box.height / 2);
+    await p.mouse.down();
+    await p.mouse.move(box.x + box.width - 1, box.y + box.height / 2, { steps: 8 });
+    await p.mouse.up();
   };
 
-  // A verb form: meaning via the lemma, and the conjugation table with the form marked.
-  await hover(page, "#mange");
-  await popupText().getByText("Conjugation").waitFor({ timeout: 20_000 });
-  const verb = await popupText().innerText();
-  check(verb.includes("to eat"), "verb: shows the meaning of the lemma");
-  check(/of\s+manger/.test(verb), "verb: says mange is a form of manger");
-  check(await page.locator("lekseis-hover-popup details[open] mark").first().innerText() === "mange", "verb: marks the hovered form in the open table");
-  check(verb.includes("nous") && verb.includes("mangeons"), "verb: shows the other persons");
-  await page.screenshot({ path: `${out}/verb.png` });
-
-  // The popup covers the next line, as a hover popup does; close it first.
-  await page.keyboard.press("Escape");
-
-  // An adjective form: gender and number.
-  await hover(page, "#belles");
-  await popupText().getByRole("columnheader", { name: "Masculine singular" }).waitFor({ timeout: 20_000 });
-  const adj = await popupText().innerText();
-  check(["beau", "belle", "beaux"].every((w) => adj.includes(w)), "adjective: shows masculine, feminine and plural forms");
-  await page.screenshot({ path: `${out}/adjective.png` });
-
-  // Text marked as English is not looked up.
-  await page.keyboard.press("Escape");
-  await hover(page, "#english");
+  // Hovering alone does nothing: a lookup needs a selection.
+  const eatBox = (await page.locator("#eat").boundingBox())!;
+  await page.mouse.move(eatBox.x + 5, eatBox.y + 5);
   await page.waitForTimeout(800);
-  check(!(await popupText().isVisible()), "English passage: no popup");
+  check(!(await popup().isVisible()), "hovering without selecting shows nothing");
 
-  // A selected phrase is translated.
-  await page.evaluate(() => {
-    const r = document.createRange();
-    r.selectNodeContents(document.getElementById("phrase")!);
-    getSelection()!.removeAllRanges();
-    getSelection()!.addRange(r);
-  });
-  await hover(page, "#phrase");
-  await popupText().locator(".lh-translation, .lh-warnings").first().waitFor({ timeout: 20_000 });
-  const phrase = await popupText().innerText();
-  check(phrase.includes("prenons le petit-déjeuner"), "phrase: looks up the whole selection");
-  console.log(`  translation: ${await popupText().locator(".lh-translation, .lh-warnings").first().innerText()}`);
+  // English word → a tab per learning language, with dictionary translations and forms.
+  await doubleClick(page, "#eat");
+  await popup().locator("[role=tab]").first().waitFor({ timeout: 20_000 });
+  await popup().getByText("Conjugation").first().waitFor({ timeout: 20_000 });
+  const tabs = await popup().locator("[role=tab]").allInnerTexts();
+  check(tabs.join(",") === "French,Greek,Spanish", `English word: a tab per language (${tabs.join(", ")})`);
+  const eat = await popupText();
+  check(eat.includes("manger") && eat.includes("mangeons"), "English word: French translation with its conjugation");
+  await page.screenshot({ path: `${out}/translate-french.png` });
+  const visiblePanel = () => popup().locator("[role=tabpanel]:not([hidden])");
+  check(await visiblePanel().locator("a.lh-wikt").getAttribute("href") === "https://en.wiktionary.org/wiki/manger#French",
+    "English word: French tab links to manger's Wiktionary entry");
+
+  await popup().locator("[role=tab]", { hasText: "Greek" }).click();
+  const greekOpen = await visiblePanel().locator("details.lh-table[open]").first().evaluate((el) => el.textContent ?? "");
+  check(greekOpen.startsWith("Active present") && greekOpen.includes("τρώμε"), "English word: Greek tab opens τρώω's present tense");
+  await page.screenshot({ path: `${out}/translate-greek.png` });
+
+  await popup().locator("[role=tab]", { hasText: "Spanish" }).click();
+  const spanishOpen = await visiblePanel().locator("details.lh-table[open]").first().evaluate((el) => el.textContent ?? "");
+  check(spanishOpen.startsWith("Indicative present") && ["nosotros", "comemos", "ustedes", "comen", "ellos/ellas"].every((w) => spanishOpen.includes(w)),
+    "English word: Spanish tab opens the present with every plural person");
+  await visiblePanel().locator("details.lh-table[open]").first().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${out}/translate-spanish.png` });
+  await close();
+
+  // An inflected English word is traced to its lemma.
+  await doubleClick(page, "#ate");
+  await popup().locator("[role=tab]").first().waitFor({ timeout: 20_000 });
+  check(/simple past\s+of\s+eat/.test(await popupText()), "English inflection: 'ate' is the simple past of eat");
+  await close();
+
+  // A noun shows gender.
+  await doubleClick(page, "#house");
+  await popup().locator("abbr.lh-gender").first().waitFor({ timeout: 20_000 });
+  check((await popupText()).includes("maison"), "English noun: French maison, with gender");
+  await close();
+
+  // An English phrase → machine translation per language.
+  await drag(page, "#phrase");
+  await popup().locator(".lh-translation").first().waitFor({ timeout: 20_000 });
+  const phrase = await popup().locator("[role=tabpanel]:not([hidden]) .lh-translation").innerText();
+  check(phrase.startsWith("Machine translation:"), `English phrase: machine translated (${phrase})`);
   await page.screenshot({ path: `${out}/phrase.png` });
+  await close();
+
+  // A word in a learning language → its meaning in English and its other forms.
+  await doubleClick(page, "#mange");
+  await popup().getByText("Conjugation").waitFor({ timeout: 20_000 });
+  const mange = await popupText();
+  check(/of\s+manger/.test(mange) && mange.includes("to eat"), "French word: form of manger, meaning 'to eat'");
+  check(await page.locator("lekseis-hover-popup details[open] mark").first().innerText() === "mange", "French word: marks the selected form");
+  await page.screenshot({ path: `${out}/explain-french.png` });
+  await close();
+
+  await doubleClick(page, "#belles");
+  await popup().getByRole("columnheader", { name: "Masculine singular" }).waitFor({ timeout: 20_000 });
+  const belles = await popupText();
+  check(["beau", "belle", "beaux"].every((w) => belles.includes(w)), "French adjective: gender and number table");
+  await close();
+
+  await doubleClick(page, "#egrapsa");
+  await popup().getByText("Conjugation").waitFor({ timeout: 20_000 });
+  const greek = await popupText();
+  check(/simple past\s+of\s+γράφω/.test(greek) && greek.includes("θα γράψω"), "Greek word: aorist of γράφω, with futures");
+  await page.screenshot({ path: `${out}/explain-greek.png` });
+  await close();
+
+  // A language that's neither English nor being learned is ignored.
+  await doubleClick(page, "#german");
+  await page.waitForTimeout(800);
+  check(!(await popup().isVisible()), "German passage (not being learned): no popup");
 
   // Keyboard: Escape closes.
-  await page.keyboard.press("Escape");
-  check(!(await popupText().isVisible()), "Escape closes the popup");
-
-  // Greek: an aorist form, its lemma, and the θα future (which a filter bug once removed).
-  await page.keyboard.press("Escape");
-  await hover(page, "#egrapsa");
-  await popupText().getByText("Conjugation").waitFor({ timeout: 20_000 });
-  const greek = await popupText().evaluate((el) => el.textContent ?? "");
-  check(/simple past\s+of\s+γράφω/.test(greek), "Greek: says έγραψα is the simple past of γράφω");
-  check(greek.includes("to write"), "Greek: shows the meaning");
-  check(await page.locator("lekseis-hover-popup details[open] summary").first().innerText() === "Active simple past (aorist)", "Greek: opens the aorist table");
-  check(greek.includes("θα γράψω"), "Greek: includes the θα future");
-  await page.screenshot({ path: `${out}/greek.png` });
-
-  // Latin American Spanish: ustedes, not vosotros.
-  await page.keyboard.press("Escape");
-  await hover(page, "#comen");
-  await popupText().getByText("Conjugation").waitFor({ timeout: 20_000 });
-  const spanish = await popupText().evaluate((el) => el.textContent ?? "");
-  check(spanish.includes("ustedes") && !spanish.includes("vosotros") && !spanish.includes("coméis"), "Spanish (Latin America): ustedes replaces vosotros");
-  await page.screenshot({ path: `${out}/spanish.png` });
+  await doubleClick(page, "#comen");
+  await popup().getByText("Conjugation").waitFor({ timeout: 20_000 });
+  await close();
+  check(!(await popup().isVisible()), "Escape closes the popup");
 
   // Options page renders.
   const extId = new URL(worker.url()).host;
@@ -124,6 +154,7 @@ try {
   await options.goto(`chrome-extension://${extId}/options/options.html`);
   check(await options.getByLabel("French").isChecked(), "options: French is ticked");
   check(await options.getByLabel(/Latin America/).isChecked(), "options: Latin American Spanish is chosen");
+  check(await options.getByLabel("Whenever I select text").isChecked(), "options: lookups on selection");
   await options.screenshot({ path: `${out}/options.png`, fullPage: true });
 } finally {
   await context.close();

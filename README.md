@@ -2,9 +2,20 @@
 
 A Chrome extension for language learners. _Λέξεις_ (lékseis) is Greek for "words".
 
-On pages in a language you're learning, rest the pointer on a word to see:
+Select a word (double-click it) or a phrase on any page.
 
-- **what it means**, with examples, pronunciation and audio;
+**On a page in your own language** (English), you see it in every language
+you're learning, one tab each:
+
+- Wiktionary's translations, grouped by meaning, with gender and usage labels
+  (_eat_ → French _manger_, _bouffer_ (slang); _house_ → _maison_ f.);
+- every form of the main translation: _comer_ conjugated in all tenses,
+  _beau_ by gender and number;
+- for a phrase, a machine translation into each language.
+
+**On a page in a language you're learning**, you see:
+
+- **what it means** in English, with examples, pronunciation and audio;
 - **what form it is**: _mange_ is the "first/third-person singular present
   indicative of _manger_";
 - **all its other forms**:
@@ -12,9 +23,10 @@ On pages in a language you're learning, rest the pointer on a word to see:
   - an adjective by gender and number (German and Greek: by case too);
   - a noun by number and case.
 
-Select a phrase and hover over it to translate the whole phrase.
+Nothing happens until you select something, so ordinary reading and
+hovering aren't interrupted.
 
-![A lookup of the French verb form "mange"](docs/images/verb.png)
+![Selecting "eat" on an English page shows French, Greek and Spanish tabs](docs/images/translate.png)
 
 ## Contents
 
@@ -29,20 +41,29 @@ Select a phrase and hover over it to translate the whole phrase.
 
 ## Using it
 
-After installing, the settings page opens. Tick the languages you're learning.
+After installing, the settings page opens. Choose your language (English by
+default) and tick the languages you're learning.
 
-| To…                                   | Do this                                                              |
-| ------------------------------------- | -------------------------------------------------------------------- |
-| Look up a word                        | Rest the pointer on it (or hold <kbd>Alt</kbd>, if set in settings)  |
-| Translate a phrase                    | Select it, then hover over the selection                             |
-| Look up from the keyboard             | Select text, press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>      |
-| Look up from the mouse menu           | Select text, right-click → **Look up "…"**                           |
-| Keep the popup open to read or scroll | Click inside it; close with <kbd>Escape</kbd> or ×                   |
-| Force a site on or off                | Toolbar button → choose a rule for the site                          |
+| To…                                   | Do this                                                                 |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| Look up a word                        | Double-click it                                                         |
+| Translate a phrase                    | Drag across it to select it                                             |
+| Switch language                       | Click a tab, or use <kbd>←</kbd> <kbd>→</kbd> when a tab has focus      |
+| Look up from the keyboard             | Select text, press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>         |
+| Look up from the mouse menu           | Select text, right-click → **Look up "…"**                              |
+| Keep the popup open to read or scroll | Click inside it; close with <kbd>Escape</kbd>, × or a click elsewhere   |
+| Select text without a lookup          | Settings → only look up while holding <kbd>Alt</kbd>                    |
+| Force a site on or off                | Toolbar button → choose a rule for the site                             |
 
-A page is active when its `lang` attribute or Chrome's language detection says
-it's in a language you're learning. Passages marked with their own `lang` are
-handled separately, so a French quote in an English article still works.
+The page's `lang` attribute, or Chrome's language detection, decides which
+way a lookup goes. Text in your language is translated into the languages
+you're learning, and text in one of those is explained in your language. A
+page with no detectable language is assumed to be in yours. Passages marked
+with their own `lang` are handled separately, so a French quote in an English
+article is explained, not translated. Text in any other language is ignored.
+
+Selections longer than 300 characters are ignored, since those are usually
+for copying.
 
 The keyboard shortcut can be changed at `chrome://extensions/shortcuts`. When
 the shortcut opens a lookup, focus moves into the popup, and <kbd>Escape</kbd>
@@ -52,6 +73,11 @@ returns it to where it was.
 
 23 languages are available. Inflection tables are as good as Wiktionary's data
 for each one.
+
+- **Your language:** translations grouped by meaning come from English
+  Wiktionary's translation tables, so they're only available when your
+  language is English. With another language, single words and phrases are
+  machine translated, then the result is looked up for its forms.
 
 - **Spanish:** choose your variety in settings. It decides which
   second-person forms the tables show.
@@ -99,8 +125,8 @@ Then load it into Chrome:
 1. Open `chrome://extensions`.
 2. Turn on **Developer mode** (top right).
 3. Click **Load unpacked** and choose the `dist/` folder.
-4. The settings page opens; tick a language. Open a page in that language and
-   hover over a word.
+4. The settings page opens; tick a language you're learning. Open any English
+   page and double-click a word.
 
 ### The edit–reload loop
 
@@ -149,20 +175,28 @@ popup says "Lekseis Hover was updated. Reload the page." until you do.
 ## How it works
 
 ```
-page ──hover──▶ content script ──message──▶ service worker ──fetch──▶ kaikki.org
-                 (word under pointer,                        └──fetch──▶ MyMemory
-                  page language, popup)  ◀──result──────────
+page ──select──▶ content script ──message──▶ service worker ──fetch──▶ kaikki.org
+                  (selection, its                             └──fetch──▶ MyMemory
+                   language, popup)     ◀──result──────────
 ```
 
-- The **content script** runs on every http(s) page. It stays idle unless the
-  page, or the passage under the pointer, is in a language you're learning.
-  When the pointer rests, it finds the word with `caretPositionFromPoint` and
-  `Intl.Segmenter`, then asks the service worker for a lookup. Results are
-  shown in a shadow-DOM popup, so the page's CSS can't reach it.
-- The **service worker** fetches from both providers in parallel, follows an
-  inflected form to its lemma (_mange_ → _manger_), and caches results in
-  memory. Fetching happens here because kaikki.org sends no CORS headers, and
-  only the extension's host permissions get around that.
+- The **content script** runs on every http(s) page. It does nothing until
+  you release the mouse after selecting text. Then it works out the text's
+  language and asks the service worker for a lookup. Results are shown in a
+  shadow-DOM popup, so the page's CSS can't reach it.
+- The **service worker** routes the lookup by language:
+  - **translate** (`translate()` in `src/background/lookup.ts`) is for text in
+    your language. It reads the English word's Wiktionary translation table,
+    picks the main translation per language (preferring one with no regional
+    or slang label), and fetches that word's own entry for its forms.
+    Phrases, and words with no dictionary translation, go to MyMemory.
+  - **explain** (`explain()`) is for text in a language you're learning. It
+    fetches the word's entry, follows an inflected form to its lemma
+    (_mange_ → _manger_), and machine-translates the text into your language.
+
+  Results are cached in memory. Fetching happens in the service worker because
+  kaikki.org sends no CORS headers, and only the extension's host permissions
+  get around that.
 - **Inflection tables** are built from Wiktionary's tagged forms
   (`src/shared/inflections.ts`). Person or case goes down the side, gender and
   number across the top, with one table per tense, mood or declension type.
@@ -189,8 +223,8 @@ Both are free and need no key or account.
 | `src/shared/inflections.ts`     | Pivots tagged forms into tables                                        |
 | `src/shared/word.ts`            | Word segmentation and spellings to try (case, elision)                 |
 | `src/shared/settings.ts`        | Settings shape, defaults and validation (`chrome.storage.sync`)        |
-| `src/background/`               | Service worker: lookup, MyMemory client, cache, context menu, shortcut |
-| `src/content/`                  | Page language, word under the pointer, popup                           |
+| `src/background/`               | Service worker: translate and explain, MyMemory client, cache, menu    |
+| `src/content/`                  | Page language, the selection, popup and its language tabs              |
 | `src/options/`, `src/action/`   | Settings page and toolbar popup                                        |
 | `scripts/`                      | Smoke test, icon rendering, release packaging                          |
 | `test/fixtures/`                | Real kaikki.org responses used by unit tests                           |
@@ -210,8 +244,10 @@ classic script, because Chrome can't load content scripts as ES modules.
 
   The URL pattern is `/dictionary/<Language>/meaning/<1st char>/<1st 2 chars>/<word>.jsonl`.
 - **Smoke test** (`bun run build && bun run smoke`) loads `dist/` into
-  headless Chromium and serves a test page. It hovers over French, Greek and
-  Spanish words against the live APIs and checks the popups. Screenshots are
+  headless Chromium and serves an English page with French, Greek, Spanish and
+  German passages. It double-clicks words and drags across phrases, against
+  the live APIs, and checks the popups. It also checks that hovering alone,
+  and German (not being learned), do nothing. Screenshots are
   saved to `smoke-output/`. It needs Playwright's Chromium; run
   `bunx playwright install chromium` once if it isn't installed.
 - **By hand:** automated checks can't prove the popup is usable. Before a
@@ -236,4 +272,6 @@ there is no analytics or account.
 - Single-word machine translation is often wrong, so it's labelled as machine translation and shown after the dictionary's analysis.
 - A word split across elements (`<b>ma</b>nger`) is not detected.
 - Some sites' Content-Security-Policy blocks Wikimedia audio. **Listen** then opens the recording in a new tab.
-- Hover lookups need a mouse; on touch screens, select the text and use the context menu.
+- On touch screens, select the text and use the context menu or the keyboard shortcut; the automatic lookup follows a mouse selection.
+- Translating an English word that has several meanings shows the forms of the most common translation (Wiktionary's, with MyMemory breaking ties); the other meanings' translations are listed above it.
+- Wiktionary's coverage varies by language. Common Greek words have full tables, but rarer ones may have no translation or a stub entry. The popup then shows a machine translation and says that no table is available, rather than guessing.
