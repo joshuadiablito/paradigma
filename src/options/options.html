@@ -58,6 +58,18 @@
         </fieldset>
 
         <fieldset>
+          <legend>Translation limit</legend>
+          <label for="email">Email address (optional)</label>
+          <input id="email" type="email" autocomplete="email" spellcheck="false" aria-describedby="email-hint" />
+          <p class="error" id="email-error" hidden>Enter an email address like name@example.com, or leave it empty.</p>
+          <p class="hint" id="email-hint">
+            Free machine translation from MyMemory is limited to about 5,000 characters a day.
+            Giving an email address raises that to 50,000. It's optional. It's sent only to MyMemory,
+            with each translation request, and stored in your Chrome settings. Clear the field to remove it.
+          </p>
+        </fieldset>
+
+        <fieldset>
           <legend>Site rules</legend>
           <p class="hint">
             Normally the page language is detected automatically. Rules override that for a site;

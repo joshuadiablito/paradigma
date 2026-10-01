@@ -7,6 +7,7 @@
   --subtle: #f4f4f5;
   --accent: #1d4ed8;
   --ok: #166534;
+  --error: #b91c1c;
   font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
@@ -18,6 +19,7 @@
     --subtle: #27272c;
     --accent: #93b4ff;
     --ok: #86efac;
+    --error: #fca5a5;
   }
 }
 /* Chrome styles extension pages with body { font-size: 75% }; undo it. */
@@ -27,7 +29,7 @@ h2 { font-size: 1.1rem; margin: 0 0 0.5rem; }
 p.hint, .hint { color: var(--muted); font-size: 0.9rem; margin: 0.25rem 0; }
 a { color: var(--accent); }
 button, select, input { font: inherit; color: inherit; }
-button, select, input[type="number"] {
+button, select, input[type="number"], input[type="email"] {
   min-height: 44px;
   padding: 0 0.75rem;
   border: 1px solid var(--border);
