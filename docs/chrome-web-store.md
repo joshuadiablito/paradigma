@@ -156,7 +156,7 @@ git push origin v0.1.0
 
 | Permission                           | Justification                                                                                                                                                                                                   |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `storage`                            | Saves the user's settings: the languages they're learning, translation language, how lookups are triggered, per-site on/off rules, and an optional email address for MyMemory's higher limit.                |
+| `storage`                            | Saves the user's settings: the languages they're learning, translation language, how lookups are triggered, per-site on/off rules, and an optional email address for MyMemory's higher limit. Also keeps recent lookups' results on the device for up to 30 days, so repeating a lookup doesn't repeat its requests. |
 | `contextMenus`                       | Adds "Look up …" to the right-click menu for selected text, for touch screens and for when automatic lookups are set to need Alt.                                                                              |
 | Host `https://kaikki.org/*`          | Fetches the dictionary entry (meanings, pronunciation and inflection tables) for the word the user looks up.                                                                                                   |
 | Host `https://api.mymemory.translated.net/*` | Fetches a translation of the word or phrase the user looks up.                                                                                                                                        |
@@ -172,7 +172,9 @@ return data (JSON), which is displayed as text and never executed.
   `chrome.storage.sync`, and sent only to MyMemory with translation requests,
   to raise MyMemory's free daily limit.
 - **Website content**: the text the user looks up is sent to kaikki.org and
-  MyMemory.
+  MyMemory. Recent lookups and their results are also kept in
+  `chrome.storage.local` for up to 30 days; that copy never leaves the
+  device, so it adds nothing to these answers.
 
 Nothing else applies: no health, financial, authentication, location or
 communication data, and no browsing history or user-activity tracking.

@@ -16,8 +16,10 @@ context menu), **the selected text** and **its language** are sent to:
   languages you're learning are looked up here too.
 - **MyMemory** (api.mymemory.translated.net), which provides machine
   translation. It receives the text, up to 500 bytes, and the language pair
-  (one request per language you're learning, when translating from your own),
-  plus your email address if you've chosen to give one (see below).
+  (when translating from your own language, one request per language whose
+  tab you open). A word in a language you're learning is only sent here if
+  the dictionary doesn't explain it. MyMemory also receives your email
+  address if you've chosen to give one (see below).
   See [MyMemory's privacy policy](https://mymemory.translated.net/doc/privacy.php).
 
 These services also see what any website sees: your IP address and browser
@@ -47,8 +49,14 @@ Pronunciation audio, when you press **Listen**, is loaded from Wikimedia
   Spanish variety, per-site rules and the optional email address) are stored
   with `chrome.storage.sync`. If you use Chrome sync, Google syncs them between
   your browsers. The site rules name the sites you set them for.
-- **Recent lookups** are cached in memory to avoid repeat requests. They are
-  discarded when Chrome stops the extension's service worker.
+- **Recent lookups** (the words and phrases you selected, and the dictionary
+  entries and translations found for them) are saved in the browser's local
+  extension storage (`chrome.storage.local`) for up to 30 days, so that
+  looking the same thing up again doesn't repeat the requests. They're never
+  sent anywhere and aren't synced. At most about 5 MB is kept; the oldest
+  are removed first. To delete them, choose **Clear saved lookups** on the
+  settings page; removing the extension deletes them too. Your email address
+  is never saved with them.
 - To decide whether a page is in a language you're learning, the extension
   reads the page's `lang` attribute and passes up to 8,000 characters of its
   text to Chrome's built-in, on-device language detection
