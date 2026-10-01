@@ -138,7 +138,7 @@ git push origin v0.1.0
 > • Nothing happens until you select something; turn it off per site
 > • Keyboard shortcut, and usable with a screen reader
 >
-> 23 languages, including French, Spanish, German, Italian, Portuguese, Greek,
+> 24 languages, including French, Spanish, German, Italian, Portuguese, Greek, Māori,
 > Dutch, Russian, Polish and Japanese. Free, with no account, no tracking and
 > no ads. Dictionary data: Wiktionary via kaikki.org (CC BY-SA). Translation:
 > MyMemory.

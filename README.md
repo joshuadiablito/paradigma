@@ -71,7 +71,7 @@ returns it to where it was.
 
 ## Language notes
 
-23 languages are available. Inflection tables are as good as Wiktionary's data
+24 languages are available. Inflection tables are as good as Wiktionary's data
 for each one.
 
 - **Your language:** translations grouped by meaning come from English
@@ -98,6 +98,14 @@ for each one.
 
   Active and passive voices get separate tables. Nouns and adjectives decline
   by case, including the vocative.
+- **Māori:** verbs don't conjugate by person, so there are no verb tables;
+  their passive forms are listed instead (_kai_ → _kainga_, _kōrero_ →
+  _kōrerotia_). Nouns with an irregular plural show it beside the singular
+  (_tamaiti_ / _tamariki_, _tangata_ / _tāngata_), and selecting a plural
+  explains it as the plural of its singular. Wiktionary spells Māori with
+  macrons, so text written without them (_korero_ for _kōrero_) may not be
+  found. MyMemory's Māori machine translation is unreliable; the dictionary's
+  meanings are the ones to trust.
 - **German:** adjectives have strong, weak and mixed tables, with comparative
   and superlative. Nouns decline by case and number.
 - **French, Spanish, Italian, Portuguese, Catalan, German, Dutch, Greek:**

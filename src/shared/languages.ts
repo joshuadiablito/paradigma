@@ -23,6 +23,7 @@ export const LANGUAGES: readonly Language[] = [
   { code: "it", name: "Italian", endonym: "Italiano" },
   { code: "ja", name: "Japanese", endonym: "日本語" },
   { code: "ko", name: "Korean", endonym: "한국어" },
+  { code: "mi", name: "Māori", endonym: "Te reo Māori" },
   { code: "nb", name: "Norwegian Bokmål", endonym: "Norsk bokmål" },
   { code: "nl", name: "Dutch", endonym: "Nederlands" },
   { code: "pl", name: "Polish", endonym: "Polski" },

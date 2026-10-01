@@ -202,6 +202,21 @@ describe("adjective agreement", () => {
   });
 });
 
+describe("Māori", () => {
+  it("shows an irregular plural beside the singular", () => {
+    const t = buildInflections(entry("maori-tamaiti", "noun"), "mi").tables;
+    expect(t).toHaveLength(1);
+    expect(cell(t[0]!, "", "singular")?.forms).toEqual(["tamaiti"]);
+    expect(cell(t[0]!, "", "plural")?.forms).toEqual(["tamariki"]);
+  });
+
+  it("lists a verb's passive as another form, since verbs don't conjugate by person", () => {
+    const { tables, other } = buildInflections(entry("maori-kai", "verb"), "mi");
+    expect(tables).toEqual([]);
+    expect(other).toContainEqual({ label: "Passive", forms: ["kainga"] });
+  });
+});
+
 describe("noun declension", () => {
   const { tables, other } = buildInflections(entry("german-haus", "noun"), "de");
 

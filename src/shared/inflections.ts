@@ -22,6 +22,7 @@ const CELL_VARIANT = new Set([
   "form-of", "rare", "archaic", "dated", "obsolete", "colloquial", "dialectal",
   "uncommon", "alternative", "also", "especially", "literary", "nonstandard",
   "before-vowel", // French "bel" beside "beau"
+  "irregular", // Māori "tamariki", the irregular plural of "tamaiti", is still just the plural
   "progressive", "continuative", // Greek futures; "future imperfective" already says it
 ]);
 

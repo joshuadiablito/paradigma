@@ -14,6 +14,14 @@ describe("kaikkiUrl", () => {
     );
   });
 
+  it("encodes language names with diacritics", () => {
+    expect(kaikkiUrl("Māori", "whare")).toBe("https://kaikki.org/dictionary/M%C4%81ori/meaning/w/wh/whare.jsonl");
+  });
+
+  it("recognises a Māori plural as a form of its singular", () => {
+    expect(entry("maori-tamariki", "noun").formOf[0]).toMatchObject({ lemma: "tamaiti" });
+  });
+
   it("encodes multi-word language names", () => {
     expect(kaikkiUrl("Norwegian Bokmål", "hus")).toContain("/Norwegian%20Bokm%C3%A5l/meaning/h/hu/hus.jsonl");
   });
