@@ -41,7 +41,8 @@ const check = (ok: boolean, what: string) => {
 };
 
 try {
-  const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  let worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  const extId = new URL(worker.url()).host;
   await worker.evaluate(() =>
     chrome.storage.sync.set({ learning: ["fr", "el", "es"], native: "en", spanishVariety: "latin-america" }));
   // Close the settings tab that opens on first install.
@@ -103,6 +104,46 @@ try {
   await popup().locator("[role=tab]", { hasText: "Spanish" }).click();
   await close();
 
+  // Saved lookups: what was fetched is kept in chrome.storage.local, and a
+  // restarted service worker (its memory gone) serves it from there.
+  const extPage = await context.newPage();
+  await extPage.goto(`chrome-extension://${extId}/options/options.html`);
+  type Stored = Record<string, { savedAt?: number; items?: Record<string, { savedAt: number; usedAt: number }> }>;
+  const stored = () => extPage.evaluate(() => chrome.storage.local.get(null)) as Promise<Stored>;
+  const sourceKey = "lookup:1:source:en|fr,el,es|eat";
+  const spanishKey = "lookup:1:language:en|fr,el,es|eat|es";
+  const before = await stored();
+  check(Boolean(before["lookup:index"]) && ["fr", "el", "es"].every((l) => before[`lookup:1:language:en|fr,el,es|eat|${l}`]) && Boolean(before[sourceKey]),
+    `saved lookups: 'eat' and each language's translation are saved (${Object.keys(before).filter((k) => k.startsWith("lookup:")).length} keys)`);
+
+  await worker.evaluate(() => { (self as unknown as { smokeMarker: boolean }).smokeMarker = true; });
+  // An extension page's DevTools session can stop the extension's service worker.
+  const cdp = await context.newCDPSession(extPage);
+  await cdp.send("ServiceWorker.enable");
+  await cdp.send("ServiceWorker.stopAllWorkers");
+  await page.waitForTimeout(1000);
+  await doubleClick(page, "#eat");
+  await popup().getByText("Conjugation").first().waitFor({ timeout: 20_000 });
+  check((await popupText()).includes("comemos"), "saved lookups: 'eat' looked up again after the service worker was stopped");
+  await close();
+  const restarted = [];
+  for (const w of context.serviceWorkers()) {
+    const fresh = await Promise.race([
+      w.evaluate(() => (self as unknown as { smokeMarker?: boolean }).smokeMarker === undefined),
+      new Promise<null>((r) => setTimeout(() => r(null), 3000)),
+    ]).catch(() => null);
+    if (fresh === true) restarted.push(w);
+  }
+  check(restarted.length === 1, "saved lookups: the service worker really was restarted, losing its memory");
+  if (restarted[0]) worker = restarted[0];
+  const after = await stored();
+  const index = after["lookup:index"]?.items ?? {};
+  check(after[sourceKey]?.savedAt === before[sourceKey]?.savedAt && after[spanishKey]?.savedAt === before[spanishKey]?.savedAt,
+    "saved lookups: the restarted worker didn't refetch 'eat' (its saved entries are unchanged)");
+  check((index[spanishKey]?.usedAt ?? 0) > (before["lookup:index"]?.items?.[spanishKey]?.usedAt ?? Infinity),
+    "saved lookups: the restarted worker read the Spanish translation from storage");
+  await extPage.close();
+
   // An inflected English word is traced to its lemma, opening on the tab last chosen.
   await doubleClick(page, "#ate");
   await popup().locator("[role=tab]").first().waitFor({ timeout: 20_000 });
@@ -162,7 +203,6 @@ try {
   check(!(await popup().isVisible()), "Escape closes the popup");
 
   // Options page renders.
-  const extId = new URL(worker.url()).host;
   const options = await context.newPage();
   await options.goto(`chrome-extension://${extId}/options/options.html`);
   check(await options.getByLabel("French").isChecked(), "options: French is ticked");
@@ -192,6 +232,23 @@ try {
   await email.press("Tab");
   await options.locator("#saved", { hasText: "removed" }).waitFor();
   check(await storedEmail() === "", "options: clearing the email stores nothing");
+
+  // Saved lookups: a rough size, and a button that clears them and nothing else.
+  await options.reload();
+  const size = options.locator("#saved-lookups-size");
+  await size.filter({ hasText: /^(About|Nothing)/ }).waitFor();
+  const sizeText = await size.innerText();
+  check(/^About \d+(\.\d)? (KB|MB) in \d+ saved results?\.$/.test(sizeText), `options: shows how much is saved (${sizeText})`);
+  const clear = options.getByRole("button", { name: "Clear saved lookups" });
+  check((await clear.boundingBox())!.height >= 44, "options: the clear button is at least 44px tall");
+  await clear.click();
+  await options.locator("#saved", { hasText: "Cleared saved lookups." }).waitFor();
+  check(await size.innerText() === "Nothing saved at the moment.", "options: clearing announces it and empties the saved lookups");
+  const local = await options.evaluate(() => chrome.storage.local.get(null));
+  check(Object.keys(local).every((k) => !k.startsWith("lookup:")) && local.lastLanguage !== undefined,
+    "options: clearing leaves no saved lookups, but keeps the remembered tab");
+  const sync = await options.evaluate(() => chrome.storage.sync.get("learning"));
+  check(JSON.stringify(sync.learning) === JSON.stringify(["fr", "el", "es"]), "options: clearing saved lookups keeps the settings");
 } finally {
   await context.close();
   await server.stop(true);
