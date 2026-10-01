@@ -11,3 +11,4 @@ input[type="checkbox"], input[type="radio"] { width: 1.15rem; height: 1.15rem; a
 .sites li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.25rem 0; border-bottom: 1px solid var(--border); }
 .saved { color: var(--ok); min-height: 1.5em; }
 kbd { font: 0.85em ui-monospace, monospace; border: 1px solid var(--border); border-radius: 4px; padding: 0 0.3em; background: var(--subtle); }
+#clear-lookups { margin-top: 0.25rem; }

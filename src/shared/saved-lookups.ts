@@ -190,3 +190,10 @@ export function createSavedLookups(storage: StorageArea, options: SavedLookupsOp
 }
 
 export type SavedLookups = ReturnType<typeof createSavedLookups>;
+
+/** For the settings page: "About 1.2 MB in 85 saved results". Rough, since size is measured as JSON. */
+export function describeSavedLookups({ count, bytes }: SavedLookupsStats): string {
+  if (count === 0) return "Nothing saved at the moment.";
+  const size = bytes >= 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1000))} KB`;
+  return `About ${size} in ${count} saved ${count === 1 ? "result" : "results"}.`;
+}

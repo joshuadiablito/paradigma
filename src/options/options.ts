@@ -1,7 +1,10 @@
 import { LANGUAGES, languageByCode } from "../shared/languages";
+import { createSavedLookups, describeSavedLookups } from "../shared/saved-lookups";
 import { SPANISH_VARIETIES, loadSettings, plausibleEmail, saveSettings, type Settings } from "../shared/settings";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const savedLookups = createSavedLookups(chrome.storage.local);
+const savedLookupsSizeEl = $<HTMLParagraphElement>("saved-lookups-size");
 
 const learningEl = $<HTMLDivElement>("learning");
 const nativeEl = $<HTMLSelectElement>("native");
@@ -13,12 +16,17 @@ const savedEl = $<HTMLParagraphElement>("saved");
 let settings: Settings;
 let savedTimer: ReturnType<typeof setTimeout> | undefined;
 
+/** Says what just happened in the status region, which screen readers announce. */
+function announce(text: string, { fade = true } = {}): void {
+  clearTimeout(savedTimer);
+  savedEl.textContent = text;
+  if (fade) savedTimer = setTimeout(() => (savedEl.textContent = ""), 4000);
+}
+
 async function save(next: Settings, what: string): Promise<void> {
   settings = next;
   await saveSettings(settings);
-  clearTimeout(savedTimer);
-  savedEl.textContent = `Saved: ${what}.`;
-  savedTimer = setTimeout(() => (savedEl.textContent = ""), 4000);
+  announce(`Saved: ${what}.`);
 }
 
 function renderLearning(): void {
@@ -92,8 +100,7 @@ function renderEmail(): void {
     emailEl.setAttribute("aria-describedby", invalid ? "email-error email-hint" : "email-hint");
     if (invalid) {
       emailEl.setAttribute("aria-invalid", "true");
-      clearTimeout(savedTimer);
-      savedEl.textContent = "Not saved: that doesn't look like an email address.";
+      announce("Not saved: that doesn't look like an email address.", { fade: false });
       return;
     }
     emailEl.removeAttribute("aria-invalid");
@@ -128,6 +135,21 @@ function renderSites(): void {
   );
 }
 
+async function renderSavedLookups(): Promise<void> {
+  savedLookupsSizeEl.textContent = describeSavedLookups(await savedLookups.stats());
+}
+
+$("clear-lookups").addEventListener("click", async () => {
+  const cleared = await savedLookups.clear();
+  await renderSavedLookups();
+  announce(cleared ? "Cleared saved lookups." : "Couldn't clear saved lookups. Please try again.", { fade: cleared });
+});
+
+// Lookups made in other tabs while this page is open change what's saved.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") void renderSavedLookups();
+});
+
 $("shortcuts").addEventListener("click", () => void chrome.tabs.create({ url: "chrome://extensions/shortcuts" }));
 
 void loadSettings().then((s) => {
@@ -139,3 +161,5 @@ void loadSettings().then((s) => {
   renderEmail();
   renderSites();
 });
+
+void renderSavedLookups();

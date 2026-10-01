@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fakeStorage } from "../test/storage";
-import { SAVED_LOOKUPS_VERSION, createSavedLookups, type StorageArea } from "./saved-lookups";
+import { SAVED_LOOKUPS_VERSION, createSavedLookups, describeSavedLookups, type StorageArea } from "./saved-lookups";
 
 const DAY = 24 * 60 * 60 * 1000;
 const isText = (v: unknown): v is string => typeof v === "string";
@@ -160,5 +160,14 @@ describe("saved lookups", () => {
     await expect(saved.clear()).resolves.toBe(true);
     expect(await saved.stats()).toEqual({ count: 0, bytes: 0 });
     expect(storage.keys()).toEqual(["lastLanguage"]);
+  });
+});
+
+describe("describeSavedLookups", () => {
+  it("gives a rough size and count, in words", () => {
+    expect(describeSavedLookups({ count: 0, bytes: 0 })).toBe("Nothing saved at the moment.");
+    expect(describeSavedLookups({ count: 1, bytes: 200 })).toBe("About 1 KB in 1 saved result.");
+    expect(describeSavedLookups({ count: 12, bytes: 48_400 })).toBe("About 48 KB in 12 saved results.");
+    expect(describeSavedLookups({ count: 85, bytes: 1_234_567 })).toBe("About 1.2 MB in 85 saved results.");
   });
 });
