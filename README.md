@@ -311,3 +311,9 @@ your browser, and there is no analytics or account.
 - On touch screens, select the text and use the context menu or the keyboard shortcut; the automatic lookup follows a mouse selection.
 - Translating an English word that has several meanings shows the forms of the most common translation (Wiktionary's, with MyMemory breaking ties); the other meanings' translations are listed above it.
 - Wiktionary's coverage varies by language. Common Greek words have full tables, but rarer ones may have no translation or a stub entry. The popup then shows a machine translation and says that no table is available, rather than guessing.
+
+## Licence
+
+The code is [MIT licensed](LICENSE). Dictionary data shown by the extension,
+and the test fixtures in `test/fixtures/`, come from Wiktionary and are
+licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).

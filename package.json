@@ -3,7 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Chrome extension: hover over words in languages you're learning to see meanings, conjugations and declensions.",
+  "description": "Chrome extension: select a word to see it in the languages you're learning, with every conjugation and declension, or to see what it means.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joshuadiablito/lekseis-hover.git"
+  },
   "scripts": {
     "build": "rm -rf dist && vite build && vite build -c vite.content.config.ts",
     "dev": "vite build --watch --mode development & vite build -c vite.content.config.ts --watch --mode development; wait",
