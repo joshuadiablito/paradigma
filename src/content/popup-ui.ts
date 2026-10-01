@@ -31,7 +31,7 @@ export class LookupPopup {
 
   constructor(doc: Document = document) {
     this.#doc = doc;
-    this.host = doc.createElement("lekseis-hover-popup");
+    this.host = doc.createElement("paradigma-popup");
     const shadow = this.host.attachShadow({ mode: "open" });
     const style = doc.createElement("style");
     style.textContent = popupCss;

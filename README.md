@@ -1,6 +1,8 @@
-# Lekseis Hover
+# Paradigma
 
-A Chrome extension for language learners. _Λέξεις_ (lékseis) is Greek for "words".
+A Chrome extension for language learners. A word's _paradigm_ is its full set of
+forms, every conjugation and declension, and that's what Paradigma shows you
+(_παράδειγμα_ is Greek for "example, pattern").
 
 Select a word (double-click it) or a phrase on any page.
 
@@ -124,8 +126,8 @@ for each one.
 ### Install and load the extension
 
 ```sh
-git clone git@github.com:joshuadiablito/lekseis-hover.git
-cd lekseis-hover
+git clone git@github.com:joshuadiablito/paradigma.git
+cd paradigma
 bun install
 bun run build
 ```
@@ -155,7 +157,7 @@ changes on its own:
 | `public/manifest.json`                          | Click ↻ on the extension card                               |
 
 After ↻, pages that were already open still run the old content script. The
-popup says "Lekseis Hover was updated. Reload the page." until you do.
+popup says "Paradigma was updated. Reload the page." until you do.
 
 ### Debugging
 
@@ -163,8 +165,8 @@ popup says "Lekseis Hover was updated. Reload the page." until you do.
   open DevTools for it. Lookups and network requests to kaikki.org and MyMemory
   appear there.
 - **Content script:** use the page's own DevTools. In the Console's context
-  dropdown, choose **Lekseis Hover** to run code in the extension's world. The
-  popup is `<lekseis-hover-popup>`, with its content in an open shadow root.
+  dropdown, choose **Paradigma** to run code in the extension's world. The
+  popup is `<paradigma-popup>`, with its content in an open shadow root.
 - **Settings:** in the service worker console, run
   `await chrome.storage.sync.get(null)` to see what's stored, or
   `chrome.storage.sync.clear()` to start over.
@@ -295,7 +297,7 @@ first submission, the store listing, the privacy answers and updates.
 
 ## Privacy
 
-**There is no Lekseis Hover server, and the developer collects nothing.**
+**There is no Paradigma server, and the developer collects nothing.**
 Everything runs in your browser. Your settings and recent lookups stay in your
 browser's own storage, and you can clear them from the settings page. The only
 thing that leaves your browser is what you choose to look up, and it goes

@@ -1,6 +1,6 @@
 # Releasing to the Chrome Web Store
 
-How to publish Lekseis Hover and ship updates. The Web Store dashboard changes
+How to publish Paradigma and ship updates. The Web Store dashboard changes
 from time to time. If a field here doesn't match what you see, trust the
 dashboard and update this page.
 
@@ -23,7 +23,7 @@ to kaikki.org and MyMemory. The policy is [PRIVACY.md](../PRIVACY.md), but
 Do one of the following:
 
 - Make the repository public. The URL is then
-  `https://github.com/joshuadiablito/lekseis-hover/blob/main/PRIVACY.md`.
+  `https://github.com/joshuadiablito/paradigma/blob/main/PRIVACY.md`.
 - Or publish the contents of `PRIVACY.md` somewhere public, such as a public
   gist or your own site, and use that URL.
 
@@ -75,7 +75,7 @@ bun run package
 ```
 
 This checks that the two versions match, runs `bun run check` (typecheck,
-tests, production build), and writes `lekseis-hover-<version>.zip` with
+tests, production build), and writes `paradigma-<version>.zip` with
 `manifest.json` at its root. The zip is gitignored.
 
 ### 4. Upload
@@ -113,7 +113,7 @@ git push origin v0.1.0
 
 | Field       | Value                                                                                                                  |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Name        | From the manifest: Lekseis Hover                                                                                       |
+| Name        | From the manifest: Paradigma                                                                                       |
 | Summary     | From the manifest's `description` (132 characters at most)                                                             |
 | Category    | Education                                                                                                              |
 | Language    | English                                                                                                                |
@@ -141,7 +141,7 @@ git push origin v0.1.0
 > 24 languages, including French, Spanish, German, Italian, Portuguese, Greek, Māori,
 > Dutch, Russian, Polish and Japanese.
 >
-> Private by design: there is no Lekseis Hover server, and we collect nothing.
+> Private by design: there is no Paradigma server, and we collect nothing.
 > Your settings and recent lookups stay in your browser. Only the words you
 > choose to look up are sent, straight from your browser, to the free services
 > that answer them. No account, no tracking, no ads.

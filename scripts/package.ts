@@ -1,4 +1,4 @@
-// Builds a Chrome Web Store upload: lekseis-hover-<version>.zip, with
+// Builds a Chrome Web Store upload: paradigma-<version>.zip, with
 // manifest.json at the root of the zip as the store requires.
 //
 //   bun run package
@@ -23,7 +23,7 @@ function run(cmd: string[], cwd = root): void {
 
 run(["bun", "run", "check"]); // typecheck, tests, production build
 
-const zip = resolve(root, `lekseis-hover-${pkg.version}.zip`);
+const zip = resolve(root, `paradigma-${pkg.version}.zip`);
 if (existsSync(zip)) rmSync(zip);
 run(["zip", "-r", "-X", "-q", zip, ".", "-x", "*.map", "-x", ".DS_Store"], resolve(root, "dist"));
 console.log(`\nReady to upload: ${zip}`);

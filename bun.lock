@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "lekseis-hover",
+      "name": "paradigma",
       "devDependencies": {
         "@types/chrome": "0.3.4",
         "@types/node": "24",

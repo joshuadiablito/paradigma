@@ -52,7 +52,7 @@ try {
   await page.goto(url);
   await page.waitForTimeout(500);
 
-  const popup = () => page.locator("lekseis-hover-popup .lh-dialog");
+  const popup = () => page.locator("paradigma-popup .lh-dialog");
   const popupText = () => popup().evaluate((el) => el.textContent ?? "");
   const close = () => page.keyboard.press("Escape");
   const doubleClick = (p: Page, selector: string) => p.locator(selector).dblclick();
@@ -174,7 +174,7 @@ try {
   await popup().getByText("Conjugation").waitFor({ timeout: 20_000 });
   const mange = await popupText();
   check(/of\s+manger/.test(mange) && mange.includes("to eat"), "French word: form of manger, meaning 'to eat'");
-  check(await page.locator("lekseis-hover-popup details[open] mark").first().innerText() === "mange", "French word: marks the selected form");
+  check(await page.locator("paradigma-popup details[open] mark").first().innerText() === "mange", "French word: marks the selected form");
   await page.screenshot({ path: `${out}/explain-french.png` });
   await close();
 

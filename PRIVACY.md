@@ -1,13 +1,13 @@
-# Lekseis Hover privacy policy
+# Paradigma privacy policy
 
 _Last updated: 1 October 2026_
 
-Lekseis Hover helps you learn languages by showing the meaning and forms of
+Paradigma helps you learn languages by showing the meaning and forms of
 words on web pages. This policy explains what data it handles.
 
 ## In short
 
-- **We don't collect anything.** There is no Lekseis Hover server, account or
+- **We don't collect anything.** There is no Paradigma server, account or
   database. The developer never receives, sees or stores your lookups, your
   settings, the pages you visit, or anything else about you.
 - **Everything happens in your browser.** Your settings and recent lookups

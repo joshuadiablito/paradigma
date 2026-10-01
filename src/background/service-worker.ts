@@ -8,7 +8,7 @@ import { createLookupService } from "./lookup-service";
 // service worker has host permissions, so it does the fetching.
 
 const lookups = createLookupService(fetch, chrome.storage.local);
-const CONTEXT_MENU_ID = "lekseis-hover-lookup";
+const CONTEXT_MENU_ID = "paradigma-lookup";
 
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 

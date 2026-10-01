@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => ({
     lib: {
       entry: resolve(import.meta.dirname, "src/content/content.ts"),
       formats: ["iife"],
-      name: "LekseisHover",
+      name: "Paradigma",
       fileName: () => "content.js",
     },
   },

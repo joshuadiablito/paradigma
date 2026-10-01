@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Lekseis Hover",
+  "name": "Paradigma",
   "version": "0.1.0",
   "description": "Select a word to see it in the languages you're learning, with every conjugation and declension, or to see what it means.",
   "minimum_chrome_version": "128",
@@ -22,7 +22,7 @@
   },
   "action": {
     "default_popup": "action/action.html",
-    "default_title": "Lekseis Hover",
+    "default_title": "Paradigma",
     "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png" }
   },
   "options_ui": { "page": "options/options.html", "open_in_tab": true },

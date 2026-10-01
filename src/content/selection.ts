@@ -9,7 +9,7 @@ export interface Selected {
 /** Longer selections are almost certainly for copying, not looking up. */
 export const MAX_SELECTION_CHARS = 300;
 
-const EDITABLE = "input, textarea, select, [contenteditable=''], [contenteditable='true'], lekseis-hover-popup";
+const EDITABLE = "input, textarea, select, [contenteditable=''], [contenteditable='true'], paradigma-popup";
 
 /**
  * The current selection, if it's something to look up: non-empty, not too

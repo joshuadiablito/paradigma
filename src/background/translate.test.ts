@@ -30,7 +30,7 @@ describe("translateWithMyMemory", () => {
 
   it("points to the email setting when the daily limit is reached", async () => {
     const fetchFn = reply({ quotaFinished: true, responseStatus: 200, responseData: { translatedText: "x" } });
-    await expect(translateWithMyMemory("x", "fr", "en", fetchFn)).rejects.toThrow(/email in Lekseis Hover's settings/);
+    await expect(translateWithMyMemory("x", "fr", "en", fetchFn)).rejects.toThrow(/email in the Paradigma settings/);
   });
 
   it("reports API errors", async () => {

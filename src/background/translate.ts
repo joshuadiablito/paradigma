@@ -27,7 +27,7 @@ export function myMemoryProblem(reply: unknown): TranslationError | undefined {
   // Quota and error messages arrive as a "successful" translation in capitals.
   if (body.quotaFinished || translated.startsWith("MYMEMORY WARNING")) {
     return new TranslationError(
-      "MyMemory's free daily limit has been reached. Adding your email in Lekseis Hover's settings raises it.",
+      "MyMemory's free daily limit has been reached. Adding your email in the Paradigma settings raises it.",
     );
   }
   if (Number(body.responseStatus) !== 200 || !translated) {

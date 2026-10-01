@@ -37,7 +37,7 @@ async function main(): Promise<void> {
     : await chrome.tabs.sendMessage<StatusRequest, StatusResponse>(tab.id, { type: "status" }).catch(() => undefined);
 
   if (!status) {
-    statusEl.textContent = "Lekseis Hover can't run on this page. If you just installed it, reload the page.";
+    statusEl.textContent = "Paradigma can't run on this page. If you just installed it, reload the page.";
     return;
   }
   const langName = status.lang ? (languageByCode(status.lang)?.name ?? status.lang) : "";

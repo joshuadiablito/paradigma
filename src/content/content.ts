@@ -15,7 +15,7 @@ import { currentSelection, type Selected } from "./selection";
 
 const DETECTION_SAMPLE_CHARS = 8000;
 // Messaging fails when the extension was reloaded or updated: this old content script is orphaned.
-const ORPHANED = "Lekseis Hover was updated. Reload the page to keep using it.";
+const ORPHANED = "Paradigma was updated. Reload the page to keep using it.";
 
 let settings: Settings;
 let page: PageLanguage = { lang: null, reason: "no-languages" };
