@@ -3,7 +3,6 @@ main { max-width: 44rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
 .language-grid label, .choice { display: flex; align-items: center; gap: 0.5rem; min-height: 44px; }
 input[type="checkbox"], input[type="radio"] { width: 1.15rem; height: 1.15rem; accent-color: var(--accent); }
 .endonym { color: var(--muted); }
-#delay { width: 8rem; display: block; margin-top: 0.25rem; }
 #email { width: min(100%, 24rem); box-sizing: border-box; display: block; margin-top: 0.25rem; }
 #email[aria-invalid="true"] { border-color: var(--error); }
 .error { color: var(--error); font-size: 0.9rem; margin: 0.25rem 0; }
