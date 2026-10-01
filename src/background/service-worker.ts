@@ -7,7 +7,7 @@ import { createLookupService } from "./lookup-service";
 // and a content script's requests are subject to the page's origin. The
 // service worker has host permissions, so it does the fetching.
 
-const lookups = createLookupService();
+const lookups = createLookupService(fetch, chrome.storage.local);
 const CONTEXT_MENU_ID = "lekseis-hover-lookup";
 
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));

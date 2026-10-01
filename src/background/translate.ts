@@ -5,9 +5,36 @@
 // https://mymemory.translated.net/doc/usagelimits.php
 
 export const MYMEMORY_MAX_BYTES = 500;
-const MYMEMORY_HOST = "api.mymemory.translated.net";
+export const MYMEMORY_HOST = "api.mymemory.translated.net";
 
 export class TranslationError extends Error {}
+
+interface MyMemoryBody {
+  responseStatus?: number | string;
+  responseDetails?: string;
+  quotaFinished?: boolean;
+  responseData?: { translatedText?: string };
+  matches?: { translation?: unknown }[];
+}
+
+/**
+ * What's wrong with a MyMemory reply that arrived with HTTP 200, if anything:
+ * the daily limit, an error, or no translation at all.
+ */
+export function myMemoryProblem(reply: unknown): TranslationError | undefined {
+  const body = (typeof reply === "object" && reply !== null ? reply : {}) as MyMemoryBody;
+  const translated = typeof body.responseData?.translatedText === "string" ? body.responseData.translatedText.trim() : "";
+  // Quota and error messages arrive as a "successful" translation in capitals.
+  if (body.quotaFinished || translated.startsWith("MYMEMORY WARNING")) {
+    return new TranslationError(
+      "MyMemory's free daily limit has been reached. Adding your email in Lekseis Hover's settings raises it.",
+    );
+  }
+  if (Number(body.responseStatus) !== 200 || !translated) {
+    return new TranslationError(body.responseDetails || "MyMemory returned no translation");
+  }
+  return undefined;
+}
 
 export interface MachineTranslation {
   text: string;
@@ -41,25 +68,11 @@ export async function machineTranslate(
 
   const res = await fetchFn(url, { headers: { Accept: "application/json" } });
   if (!res.ok) throw new TranslationError(`MyMemory responded ${res.status}`);
-  const body = (await res.json()) as {
-    responseStatus?: number | string;
-    responseDetails?: string;
-    quotaFinished?: boolean;
-    responseData?: { translatedText?: string };
-    matches?: { translation?: unknown }[];
-  };
+  const body = (await res.json()) as MyMemoryBody;
+  const problem = myMemoryProblem(body);
+  if (problem) throw problem;
 
-  const translated = body.responseData?.translatedText?.trim();
-  // Quota and error messages arrive as a "successful" translation in capitals.
-  if (body.quotaFinished || translated?.startsWith("MYMEMORY WARNING")) {
-    throw new TranslationError(
-      "MyMemory's free daily limit has been reached. Adding your email in Lekseis Hover's settings raises it.",
-    );
-  }
-  if (Number(body.responseStatus) !== 200 || !translated) {
-    throw new TranslationError(body.responseDetails || "MyMemory returned no translation");
-  }
-  const main = decodeEntities(translated);
+  const main = decodeEntities(body.responseData!.translatedText!.trim());
   const alternatives = [...new Set(
     (body.matches ?? [])
       .map((m) => (typeof m.translation === "string" ? decodeEntities(m.translation.trim()) : ""))
