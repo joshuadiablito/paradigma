@@ -82,23 +82,33 @@ try {
   check(await visiblePanel().locator("a.lh-wikt").getAttribute("href") === "https://en.wiktionary.org/wiki/manger#French",
     "English word: French tab links to manger's Wiktionary entry");
 
+  // Later tabs are translated only when chosen: nothing is fetched for them up front.
+  const greekPanel = popup().locator("[role=tabpanel]").nth(1);
+  check(await greekPanel.evaluate((el) => el.textContent ?? "") === "", "English word: the Greek tab isn't loaded before it's chosen");
   await popup().locator("[role=tab]", { hasText: "Greek" }).click();
+  await visiblePanel().locator("details.lh-table[open]").first().waitFor({ timeout: 20_000 });
   const greekOpen = await visiblePanel().locator("details.lh-table[open]").first().evaluate((el) => el.textContent ?? "");
   check(greekOpen.startsWith("Active present") && greekOpen.includes("τρώμε"), "English word: Greek tab opens τρώω's present tense");
   await page.screenshot({ path: `${out}/translate-greek.png` });
 
   await popup().locator("[role=tab]", { hasText: "Spanish" }).click();
+  await visiblePanel().locator("details.lh-table[open]").first().waitFor({ timeout: 20_000 });
   const spanishOpen = await visiblePanel().locator("details.lh-table[open]").first().evaluate((el) => el.textContent ?? "");
   check(spanishOpen.startsWith("Indicative present") && ["nosotros", "comemos", "ustedes", "comen", "ellos/ellas"].every((w) => spanishOpen.includes(w)),
     "English word: Spanish tab opens the present with every plural person");
   await visiblePanel().locator("details.lh-table[open]").first().scrollIntoViewIfNeeded();
   await page.screenshot({ path: `${out}/translate-spanish.png` });
+  await popup().locator("[role=tab]", { hasText: "French" }).click();
+  check((await visiblePanel().innerText()).includes("mangeons"), "English word: going back to French still shows its conjugation");
+  await popup().locator("[role=tab]", { hasText: "Spanish" }).click();
   await close();
 
-  // An inflected English word is traced to its lemma.
+  // An inflected English word is traced to its lemma, opening on the tab last chosen.
   await doubleClick(page, "#ate");
   await popup().locator("[role=tab]").first().waitFor({ timeout: 20_000 });
   check(/simple past\s+of\s+eat/.test(await popupText()), "English inflection: 'ate' is the simple past of eat");
+  check(await popup().locator("[role=tab][aria-selected=true]").innerText() === "Spanish", "English inflection: opens on Spanish, the tab last chosen");
+  await popup().locator("[role=tab]", { hasText: "French" }).click();
   await close();
 
   // A noun shows gender.
@@ -112,6 +122,9 @@ try {
   await popup().locator(".lh-translation").first().waitFor({ timeout: 20_000 });
   const phrase = await popup().locator("[role=tabpanel]:not([hidden]) .lh-translation").innerText();
   check(phrase.startsWith("Machine translation:"), `English phrase: machine translated (${phrase})`);
+  const phraseFooter = await popup().locator("footer").innerText();
+  check(await popup().locator("a").count() === 0 && !phraseFooter.includes("Wiktionary"),
+    `English phrase: no Wiktionary link or credit (footer: ${phraseFooter})`);
   await page.screenshot({ path: `${out}/phrase.png` });
   await close();
 
