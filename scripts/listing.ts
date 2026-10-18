@@ -189,7 +189,7 @@ try {
       font-family: ${FONT}; color: #fff; background: linear-gradient(135deg, ${BLUE}, #1e3a8a); }
     .text { padding-left: ${withShot ? 96 : 36}px; flex: ${withShot ? "0 0 520px" : "1"}; }
     .name { display: flex; align-items: center; gap: ${withShot ? 16 : 10}px; font-size: ${withShot ? 56 : 38}px; font-weight: 700; letter-spacing: -.01em; }
-    .name img { width: ${withShot ? 88 : 64}px; height: ${withShot ? 88 : 64}px; margin: -10px; }
+    .name img { width: ${withShot ? 80 : 56}px; height: ${withShot ? 80 : 56}px; margin-right: ${withShot ? 8 : 4}px; background: #fff; border-radius: ${withShot ? 20 : 14}px; }
     p { margin: ${withShot ? 20 : 12}px 0 0; font-size: ${withShot ? 26 : 19}px; line-height: 1.35; color: #dbe4ff; }
     .shot { border-radius: 12px; box-shadow: 0 24px 60px rgba(0,0,0,.35); width: 680px; height: 470px; object-fit: cover; object-position: 0 0; }
     </style></head><body><div class="text"><div class="name"><img src="${ICON}" alt="">Paradigma</div>
