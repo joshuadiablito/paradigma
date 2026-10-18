@@ -328,7 +328,7 @@ async function translateInto(source: TranslationSource, lang: string, fetchFn: F
 
 export interface SourceOptions {
   text: string;
-  /** Language of the text: the user's own. */
+  /** Language of the text: the user's own, or one being learned when translating into another. */
   from: string;
   /** Languages being learned, whose translations to keep from the dictionary. */
   targets: string[];

@@ -37,7 +37,22 @@ export function entriesToShow(result: ExplainResult): Entry[] {
   return [...own, ...(matching.length > 0 ? matching : result.lemmas)];
 }
 
-function renderTable(doc: Document, table: InflectionTable, query: string, lang: string): HTMLElement {
+/**
+ * Makes a word or form something to listen to: a button showing `content`
+ * that says `text`, or `content` as it is when it can't be said.
+ */
+type Say = (text: string, content: Node | string) => Node | string;
+
+const noSay: Say = (_text, content) => content;
+
+/** What a table cell says: the form with its subject pronoun, "nous mangeons", "j’aime", "il mange". */
+export function cellSpeech(pronoun: string | undefined, form: string): string {
+  if (!pronoun) return form;
+  const first = pronoun.split("/")[0]!;
+  return first.endsWith("’") ? `${first}${form}` : `${first} ${form}`;
+}
+
+function renderTable(doc: Document, table: InflectionTable, query: string, lang: string, say: Say): HTMLElement {
   const q = query.toLocaleLowerCase();
   const hasRowHeader = table.rows.some((r) => r.key);
   return h(doc, "table", {},
@@ -59,7 +74,7 @@ function renderTable(doc: Document, table: InflectionTable, query: string, lang:
               cell.pronoun && h(doc, "span", { class: "lh-pronoun" }, cell.pronoun.endsWith("’") ? cell.pronoun : `${cell.pronoun} `),
               cell.forms.flatMap((f, i) => [
                 i > 0 ? " / " : null,
-                f.toLocaleLowerCase() === q ? h(doc, "mark", {}, f) : f,
+                say(cellSpeech(cell.pronoun, f), f.toLocaleLowerCase() === q ? h(doc, "mark", {}, f) : f),
               ]),
             );
           }),
@@ -77,8 +92,21 @@ interface EntryContext {
   sensesShown?: number;
 }
 
-function renderEntry(doc: Document, entry: Entry, result: EntryContext, options: InflectionOptions): HTMLElement {
+function renderEntry(
+  doc: Document,
+  entry: Entry,
+  result: EntryContext,
+  options: RenderOptions,
+  handlers?: RenderHandlers,
+): HTMLElement {
   const { tables, other } = buildInflections(entry, result.lang, options);
+  // Every form can be listened to. Wiktionary's recording is of the entry's
+  // own word; its other forms are read by the computer's voice.
+  const status = h(doc, "p", { class: "lh-listen-status", role: "status" });
+  const recordings = entry.audioUrl ? { [entry.word]: entry.audioUrl } : {};
+  const say = handlers ? sayer(doc, result.lang, recordings, handlers, options, status) : noSay;
+  // Forms other than the entry's own word need a voice.
+  const sayable = handlers !== undefined && (options.speechLanguages?.has(result.lang) ?? false);
   // Open the first tense (person tables come first), and the table the
   // selected form is in if that's another: selecting a Spanish participle
   // still shows who does what.
@@ -99,10 +127,11 @@ function renderEntry(doc: Document, entry: Entry, result: EntryContext, options:
 
   return h(doc, "section", { class: "lh-entry" },
     h(doc, "h3", {},
-      h(doc, "span", { lang: result.lang }, entry.word),
+      h(doc, "span", { lang: result.lang }, say(entry.word, entry.word)),
       " ",
       h(doc, "span", { class: "lh-pos" }, posLabel(entry.pos)),
     ),
+    status,
     entry.head && h(doc, "p", { class: "lh-head", lang: result.lang }, entry.head),
     entry.ipa && entry.word !== result.query && h(doc, "p", { class: "lh-ipa" }, entry.ipa),
     shownSenses.length > 0 && h(doc, "ol", { class: "lh-senses" }, shownSenses.map(senseItem)),
@@ -110,20 +139,23 @@ function renderEntry(doc: Document, entry: Entry, result: EntryContext, options:
       h(doc, "summary", {}, `${hiddenSenses.length} more meaning${hiddenSenses.length === 1 ? "" : "s"}`),
       h(doc, "ol", { class: "lh-senses", start: limit + 1 }, hiddenSenses.map(senseItem)),
     ),
-    tables.length > 0 && h(doc, "h4", {}, entry.pos === "verb" ? "Conjugation" : "Forms"),
+    tables.length > 0 && h(doc, "h4", {},
+      entry.pos === "verb" ? "Conjugation" : "Forms",
+      sayable && h(doc, "span", { class: "lh-hint" }, " · select a form to hear it"),
+    ),
     // A lone untitled table (most adjectives and nouns) needs no disclosure wrapper.
     tables.length === 1 && tables[0]!.title === "Forms"
-      ? renderTable(doc, tables[0]!, result.query, result.lang)
+      ? renderTable(doc, tables[0]!, result.query, result.lang, say)
       : tables.map((t) =>
           h(doc, "details", { class: "lh-table", open: openIds.has(t.id) },
             h(doc, "summary", {}, t.title),
-            renderTable(doc, t, result.query, result.lang),
+            renderTable(doc, t, result.query, result.lang, say),
           ),
         ),
     other.length > 0 && h(doc, "dl", { class: "lh-other" },
       other.flatMap((o) => [
         h(doc, "dt", {}, o.label),
-        h(doc, "dd", { lang: result.lang }, o.forms.join(", ")),
+        h(doc, "dd", { lang: result.lang }, o.forms.flatMap((f, i) => [i > 0 ? ", " : null, say(f, f)])),
       ]),
     ),
     tables.length === 0 && INFLECTED.has(entry.pos) && h(doc, "p", { class: "lh-empty" },
@@ -174,34 +206,67 @@ const SPOKEN_LABELS: Record<Spoken, string> = {
   voice: "Reading it with your computer's voice.",
 };
 
+const clearTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
+
 /**
- * A Listen button that always says what happened: playing, then how, or why
- * it couldn't, so a press is never met with silence and no explanation.
+ * Says something aloud and always says what happened in `status`: playing,
+ * then how, or why it couldn't, so a press is never met with silence and no
+ * explanation.
  */
-function listenControl(doc: Document, speech: Speech, handlers: RenderHandlers): HTMLElement {
-  const status = h(doc, "span", { class: "lh-listen-status", role: "status" });
-  let clearTimer: ReturnType<typeof setTimeout> | undefined;
+function play(status: HTMLElement, speech: Speech, handlers: RenderHandlers): void {
   const show = (text: string, error = false) => {
-    clearTimeout(clearTimer);
+    clearTimeout(clearTimers.get(status));
     status.textContent = text;
     status.classList.toggle("lh-listen-error", error);
   };
+  show("Playing…");
+  handlers.onListen(speech).then(
+    (spoken) => {
+      show(SPOKEN_LABELS[spoken]);
+      clearTimers.set(status, setTimeout(() => show(""), 4000));
+    },
+    (e: unknown) => show(e instanceof Error ? e.message : String(e), true),
+  );
+}
+
+/** A Listen button, with a status saying what it did. */
+function listenControl(doc: Document, speech: Speech, handlers: RenderHandlers): HTMLElement {
+  const status = h(doc, "span", { class: "lh-listen-status", role: "status" });
   const button = h(doc, "button", {
     type: "button",
     class: "lh-audio",
     "aria-label": `Listen to “${speech.text}”`,
-    onclick: () => {
-      show("Playing…");
-      handlers.onListen(speech).then(
-        (spoken) => {
-          show(SPOKEN_LABELS[spoken]);
-          clearTimer = setTimeout(() => show(""), 4000);
-        },
-        (e: unknown) => show(e instanceof Error ? e.message : String(e), true),
-      );
-    },
+    onclick: () => play(status, speech, handlers),
   }, "▶ Listen");
   return h(doc, "span", { class: "lh-listen" }, button, status);
+}
+
+/**
+ * Words and forms as buttons that say them, announcing in `status`. A word
+ * with a recording in `recordings` plays it; the rest need a voice for the
+ * language, and without one stay plain text.
+ */
+function sayer(
+  doc: Document,
+  lang: string,
+  recordings: Record<string, string>,
+  handlers: RenderHandlers,
+  options: RenderOptions,
+  status: HTMLElement,
+): Say {
+  const voice = options.speechLanguages?.has(lang) ?? false;
+  return (text, content) => {
+    const recording = recordings[text];
+    if (!voice && recording === undefined) return content;
+    const speech: Speech = { text, lang, ...(recording ? { recording } : {}) };
+    return h(doc, "button", {
+      type: "button",
+      class: "lh-say",
+      lang,
+      "aria-label": `Listen to “${text}”`,
+      onclick: () => play(status, speech, handlers),
+    }, content);
+  };
 }
 
 function renderExplain(
@@ -244,7 +309,7 @@ function renderExplain(
   ];
   frag.append(...header.filter((n): n is Node => Boolean(n)));
 
-  for (const entry of shown) frag.append(renderEntry(doc, entry, result, options));
+  for (const entry of shown) frag.append(renderEntry(doc, entry, result, options, handlers));
 
   if (shown.length === 0 && formOf.length === 0 && !result.translation) {
     frag.append(h(doc, "p", { class: "lh-empty" }, "No dictionary entry found."));
@@ -257,9 +322,45 @@ function renderExplain(
   const link = isDictionaryCandidate(result.query) ? wiktionaryLink(doc, shown[0]?.word ?? result.query, result.lang) : undefined;
   const credits = { wiktionary: shown.length > 0 || formOf.length > 0, machine: Boolean(result.translation) };
   const end = h(doc, "footer", {});
-  fillFooter(doc, end, link, credits);
-  frag.append(end);
-  return frag;
+  const others = result.languages ?? [];
+  if (others.length === 0) {
+    fillFooter(doc, end, link, credits);
+    frag.append(end);
+    return frag;
+  }
+
+  // Other languages being learned follow the explanation, each in its own tab,
+  // translated from the text when first shown. The explanation comes first:
+  // it's in the user's own language.
+  const loaded: LanguageTranslation[] = [];
+  const updateFooter = () => fillFooter(doc, end, link, {
+    wiktionary: credits.wiktionary || loaded.some(showsDictionary),
+    machine: credits.machine || loaded.some((l) => l.machine !== undefined),
+  });
+  const sections = others.map((lang) => new LanguageSection(
+    doc,
+    lang,
+    languageByCode(lang)?.name ?? lang,
+    (t) => renderLanguagePanel(doc, t, result.query, handlers, options),
+    (t) => {
+      loaded.push(t);
+      updateFooter();
+    },
+  ));
+  const nativeName = (result.native && languageByCode(result.native)?.name) ?? "Meaning";
+  const explanation = [...frag.childNodes];
+  const tabbed = doc.createDocumentFragment();
+  tabbed.append(renderTabs(doc, [nativeName, ...sections.map((s) => s.name)], 0, (i, panel, chosen) => {
+    if (i === 0) {
+      if (!panel.hasChildNodes()) panel.append(...explanation);
+      return;
+    }
+    sections[i - 1]!.mount(panel);
+    sections[i - 1]!.load(handlers.loadLanguage, { retry: chosen });
+  }));
+  updateFooter();
+  tabbed.append(end);
+  return tabbed;
 }
 
 /** Which providers' data the popup is showing, to credit only those. */
@@ -283,11 +384,11 @@ function fillFooter(doc: Document, el: HTMLElement, link: HTMLElement | undefine
 
 const TAG_LABELS: Record<string, string> = { masculine: "m", feminine: "f", neuter: "n", common: "c", plural: "pl" };
 
-function translationWord(doc: Document, w: LanguageTranslation["senses"][number]["words"][number], lang: string) {
+function translationWord(doc: Document, w: LanguageTranslation["senses"][number]["words"][number], lang: string, say: Say) {
   const grammar = w.tags.filter((t) => TAG_LABELS[t]).map((t) => TAG_LABELS[t]);
   const usage = w.tags.filter((t) => !TAG_LABELS[t]).map((t) => t.replace(/-/g, " "));
   return h(doc, "span", { class: "lh-tr-word" },
-    h(doc, "strong", { lang }, w.word),
+    h(doc, "strong", { lang }, say(w.word, w.word)),
     w.roman && h(doc, "span", { class: "lh-roman" }, ` (${w.roman})`),
     grammar.length > 0 && h(doc, "abbr", { class: "lh-gender", title: w.tags.filter((t) => TAG_LABELS[t]).join(", ") }, ` ${grammar.join(" ")}`),
     usage.length > 0 && h(doc, "span", { class: "lh-tags" }, ` (${usage.join(", ")})`),
@@ -310,6 +411,9 @@ function renderLanguagePanel(
   const recording = t.entry && t.entry.word === t.lead ? t.entry.audioUrl : undefined;
   const speech: Speech | undefined = sayText ? { text: sayText, lang: t.lang, ...(recording ? { recording } : {}) } : undefined;
   const listenable = speech !== undefined && canListen(speech, options);
+  // Each translation can be listened to, not only the main one.
+  const wordStatus = h(doc, "p", { class: "lh-listen-status", role: "status" });
+  const say = sayer(doc, t.lang, recording && t.lead ? { [t.lead]: recording } : {}, handlers, options, wordStatus);
   const nodes: (Node | false | undefined)[] = [
     t.machine !== undefined && h(doc, "p", { class: "lh-translation" },
       h(doc, "span", { class: "lh-label" }, t.machineOf ? `Machine translation of “${t.machineOf}”: ` : "Machine translation: "),
@@ -321,15 +425,16 @@ function renderLanguagePanel(
           showPos && h(doc, "span", { class: "lh-pos" }, posLabel(s.pos)),
           showPos && " ",
           s.sense && h(doc, "span", { class: "lh-sense" }, `${s.sense}: `),
-          s.words.flatMap((w, i) => [i > 0 ? ", " : null, translationWord(doc, w, t.lang)]),
+          s.words.flatMap((w, i) => [i > 0 ? ", " : null, translationWord(doc, w, t.lang, say)]),
         ),
       ),
     ),
+    t.senses.length > 0 && wordStatus,
     Boolean(t.entry?.ipa || listenable) && h(doc, "div", { class: "lh-pronunciation" },
       t.entry?.ipa && h(doc, "span", { class: "lh-ipa" }, t.entry.ipa),
       listenable && speech && listenControl(doc, speech, handlers),
     ),
-    t.entry && renderEntry(doc, t.entry, { query: t.lead ?? t.entry.word, lang: t.lang, sensesShown: 2 }, options),
+    t.entry && renderEntry(doc, t.entry, { query: t.lead ?? t.entry.word, lang: t.lang, sensesShown: 2 }, options, handlers),
     t.senses.length === 0 && t.machine === undefined && !t.warning &&
       h(doc, "p", { class: "lh-empty" }, "No translation found."),
     t.lead !== undefined && !t.entry && !t.warning &&

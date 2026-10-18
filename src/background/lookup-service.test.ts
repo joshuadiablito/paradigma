@@ -73,6 +73,25 @@ describe("lookup service", () => {
     const result = await createLookupService(fn).lookup("manger", "fr", settings);
     expect(result.kind).toBe("explain");
   });
+
+  it("follows an explanation with the other languages being learned, translated from the text", async () => {
+    const { fn, requested } = fakeFetch({ "French/manger": "french-manger", "Spanish/comer": "spanish-comer" });
+    const service = createLookupService(fn);
+    const result = await service.lookup("manger", "fr", settings);
+    expect(result.kind === "explain" && [result.native, result.languages]).toEqual(["en", ["el", "es"]]);
+    expect(requested.some((r) => r.startsWith("Spanish/") || r === "MyMemory fr|es")).toBe(false);
+
+    await service.translateLanguage("manger", "fr", "es", settings);
+    expect(requested).toContain("MyMemory fr|es");
+  });
+
+  it("names the languages from the settings of each lookup, not the cached explanation", async () => {
+    const { fn } = fakeFetch({ "French/manger": "french-manger" });
+    const service = createLookupService(fn);
+    await service.lookup("manger", "fr", settings);
+    const result = await service.lookup("manger", "fr", { ...settings, learning: ["fr", "de"] });
+    expect(result.kind === "explain" && result.languages).toEqual(["de"]);
+  });
 });
 
 describe("lookup service: the optional MyMemory email", () => {

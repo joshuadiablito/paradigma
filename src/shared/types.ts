@@ -61,6 +61,16 @@ export interface ExplainResult {
   translation?: { text: string; provider: string };
   /** Non-fatal problems, e.g. one provider being unreachable. */
   warnings: string[];
+  /**
+   * The user's language, which the explanation is in. Set, with `languages`,
+   * from the settings of each lookup, so it's never part of a saved result.
+   */
+  native?: string;
+  /**
+   * The other languages being learned, each translated from the text in a
+   * tab after the explanation's, when that tab is first shown.
+   */
+  languages?: string[];
 }
 
 export interface TranslationSense {

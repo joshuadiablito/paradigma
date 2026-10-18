@@ -68,6 +68,20 @@ button:hover { border-color: var(--lh-muted); }
 .lh-listen-status { font-size: 12px; color: var(--lh-muted); }
 .lh-listen-status.lh-listen-error { color: var(--lh-warn); }
 .lh-listen-status:empty { display: none; }
+/* A word or form that says itself when chosen: text, not a boxed button. */
+button.lh-say {
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: none;
+  font: inherit;
+  text-decoration: underline dotted var(--lh-muted);
+  text-underline-offset: 3px;
+}
+button.lh-say:hover { color: var(--lh-accent); text-decoration-color: currentColor; }
+.lh-hint { color: var(--lh-muted); font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: normal; }
 .lh-ipa { color: var(--lh-muted); }
 .lh-translation { margin: 6px 0; font-size: 15px; }
 .lh-label { color: var(--lh-muted); }

@@ -19,7 +19,9 @@ you're learning, one tab each:
 
 - **what it means** in English, with examples and pronunciation;
 - **how it sounds**: **▶ Listen** plays a native speaker's recording when
-  Wiktionary has one, or reads it with one of your computer's own voices;
+  Wiktionary has one, or reads it with one of your computer's own voices.
+  Every translation and every form in the tables can be heard too: select
+  _belle_ or _beaux_, or _nous mangeons_ in a conjugation;
 - **what form it is**: _mange_ is the "first/third-person singular present
   indicative of _manger_";
 - **all its other forms**:
@@ -54,6 +56,7 @@ default) and tick the languages you're learning.
 | Translate a phrase                    | Drag across it to select it                                             |
 | Switch language                       | Click a tab, or use <kbd>←</kbd> <kbd>→</kbd> when a tab has focus      |
 | Hear it said                          | **▶ Listen**: a recording if Wiktionary has one, else your computer's voice |
+| Hear another form or translation      | Click it (they're underlined with dots)                                 |
 | Look up from the keyboard             | Select text, press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>         |
 | Look up from the mouse menu           | Select text, right-click → **Look up "…"**                              |
 | Keep the popup open to read or scroll | Click inside it; close with <kbd>Escape</kbd>, × or a click elsewhere   |
@@ -64,10 +67,14 @@ default) and tick the languages you're learning.
 
 The page's `lang` attribute, or Chrome's language detection, decides which
 way a lookup goes. Text in your language is translated into the languages
-you're learning, and text in one of those is explained in your language. A
-page with no detectable language is assumed to be in yours. Passages marked
-with their own `lang` are handled separately, so a French quote in an English
-article is explained, not translated. Text in any other language is ignored.
+you're learning. Text in one of those is explained in your language first,
+with a tab for each of the other languages you're learning, translated when
+you open it. A page with no detectable language is assumed to be in yours.
+Passages marked with their own `lang` are handled separately, so a French
+quote in an English article is explained, not translated, and a selection of
+four or more words has its own language detected, so English quoted on a
+Spanish page is translated. Text in any other language is ignored, as are web
+and email addresses, phone numbers, and anything else without letters.
 
 Selections longer than 300 characters are ignored, since those are usually
 for copying.

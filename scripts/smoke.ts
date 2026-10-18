@@ -21,6 +21,8 @@ const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>
 <p lang="fr">Le matin, je <span id="mange">mange</span> une pomme. Les maisons sont <span id="belles">belles</span>.</p>
 <p lang="el">Χθες <span id="egrapsa">έγραψα</span> ένα γράμμα.</p>
 <p lang="es">Ellos <span id="comen">comen</span> pan todos los días.</p>
+<p lang="es">«<span id="quoted">the weather was lovely today</span>», dijo ella.</p>
+<p>Call <span id="phone">+34 912 345 678</span>, write to <span id="email">hola@example.es</span> or visit <span id="link">www.example.es/contacto</span>.</p>
 <p lang="de">Dieser Satz ist auf <span id="german">Deutsch</span>.</p>
 </body></html>`;
 
@@ -176,6 +178,9 @@ try {
   check(/of\s+manger/.test(mange) && mange.includes("to eat"), "French word: form of manger, meaning 'to eat'");
   check(await page.locator("paradigma-popup details[open] mark").first().innerText() === "mange", "French word: marks the selected form");
   await page.screenshot({ path: `${out}/explain-french.png` });
+  const mangeTabs = await popup().locator("[role=tab]").allInnerTexts();
+  check(mangeTabs.join(",") === "English,Greek,Spanish", `French word: English first, then the other languages (${mangeTabs.join(", ")})`);
+  check(await popup().locator("[role=tab][aria-selected=true]").innerText() === "English", "French word: opens on English");
 
   // Listening: Wiktionary has a recording of "mange", played by an offscreen extension page.
   const listen = popup().getByRole("button", { name: "Listen to “mange”" });
@@ -195,12 +200,26 @@ try {
   check(heard === "Playing a native speaker's recording.", `French word: Listen says what it played (${heard || "nothing"})`);
   const voices = await sw.evaluate(async () => (await chrome.tts.getVoices()).filter((v) => !v.remote).length);
   console.log(`  (this Chromium has ${voices} on-device voice(s); words without recordings use them)`);
+  // The other languages are translated from the French when their tab is chosen.
+  await popup().locator("[role=tab]", { hasText: "Spanish" }).click();
+  await visiblePanel().locator(".lh-translation, .lh-entry, .lh-failed").first().waitFor({ timeout: 20_000 });
+  const mangeSpanish = await visiblePanel().innerText();
+  check(/com[eo]/.test(mangeSpanish) && !(await visiblePanel().locator(".lh-failed").count()),
+    `French word: the Spanish tab translates it (${mangeSpanish.split("\n")[0]})`);
+  await page.screenshot({ path: `${out}/explain-french-spanish.png` });
   await close();
 
   await doubleClick(page, "#belles");
   await popup().getByRole("columnheader", { name: "Masculine singular" }).waitFor({ timeout: 20_000 });
   const belles = await popupText();
   check(["beau", "belle", "beaux"].every((w) => belles.includes(w)), "French adjective: gender and number table");
+  // Every form can be listened to, read by the computer's voice.
+  await popup().getByRole("button", { name: "Listen to “beaux”" }).click();
+  const formStatus = popup().locator(".lh-entry .lh-listen-status").first();
+  await formStatus.filter({ hasText: /voice|recording|couldn|Nothing/ }).waitFor({ timeout: 10_000 }).catch(() => {});
+  const formHeard = (await formStatus.textContent()) ?? "";
+  check(formHeard === "Reading it with your computer's voice.", `French adjective: 'beaux' can be listened to (${formHeard || "nothing"})`);
+  await page.screenshot({ path: `${out}/explain-french-adjective.png` });
   await close();
 
   await doubleClick(page, "#egrapsa");
@@ -214,6 +233,22 @@ try {
   await doubleClick(page, "#german");
   await page.waitForTimeout(800);
   check(!(await popup().isVisible()), "German passage (not being learned): no popup");
+
+  // An English phrase quoted on a Spanish passage is detected as English, and translated.
+  await drag(page, "#quoted");
+  await popup().locator("[role=tab]").first().waitFor({ timeout: 20_000 });
+  const quotedTabs = await popup().locator("[role=tab]").allInnerTexts();
+  check(quotedTabs.join(",") === "French,Greek,Spanish", `English phrase in a Spanish passage: translated (${quotedTabs.join(", ")})`);
+  await close();
+
+  // Phone numbers, email and web addresses aren't language: no popup.
+  for (const id of ["phone", "email", "link"]) {
+    await drag(page, `#${id}`);
+    await page.waitForTimeout(800);
+    const selected = await page.evaluate(() => getSelection()?.toString());
+    check(!(await popup().isVisible()), `${id} (${selected}): no popup`);
+    await page.mouse.click(5, 5);
+  }
 
   // Keyboard: Escape closes.
   await doubleClick(page, "#comen");

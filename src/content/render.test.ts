@@ -4,7 +4,7 @@ import { parseKaikki } from "../shared/kaikki";
 import type { ExplainResult, LanguageOutcome, LanguageTranslation, TranslateResult } from "../shared/types";
 import { fixture } from "../test/fixtures";
 import type { Speech, Spoken } from "../shared/speech";
-import { entriesToShow, renderResult, type RenderOptions } from "./render";
+import { cellSpeech, entriesToShow, renderResult, type RenderOptions } from "./render";
 
 const result = (over: Partial<ExplainResult>): ExplainResult => ({
   kind: "explain",
@@ -99,6 +99,66 @@ describe("renderResult: explaining a word in a language being learned", () => {
     expect(found).not.toContain("MyMemory");
     const missing = render(result({ entries: [], lemmas: [], translation: { text: "eats", provider: "MyMemory" } }));
     expect(missing.querySelector("footer")?.textContent).toBe("Open “mange” in Wiktionary · Data: MyMemory");
+  });
+});
+
+describe("renderResult: a word in a language being learned, with other languages too", () => {
+  const spanish: LanguageTranslation = {
+    lang: "es",
+    senses: [],
+    machine: "comer",
+    lead: "comer",
+    entry: parseKaikki(fixture("spanish-comer")).find((e) => e.pos === "verb")!,
+  };
+
+  function renderWithLanguages(over: Partial<ExplainResult> = {}) {
+    let release: (outcome: LanguageOutcome) => void = () => {};
+    const loadLanguage = vi.fn(() => new Promise<LanguageOutcome>((resolve) => { release = resolve; }));
+    const onChooseLanguage = vi.fn();
+    const root = document.createElement("div");
+    root.append(renderResult(document, result({ native: "en", languages: ["es"], ...over }), {
+      onListen: vi.fn(async (): Promise<Spoken> => "voice"), loadLanguage, onChooseLanguage,
+    }));
+    document.body.replaceChildren(root);
+    const tabs = [...root.querySelectorAll<HTMLElement>("[role=tab]")];
+    const panels = [...root.querySelectorAll<HTMLElement>("[role=tabpanel]")];
+    return { root, tabs, panels, loadLanguage, onChooseLanguage, release: (o: LanguageOutcome) => release(o) };
+  }
+
+  it("shows the explanation in the user's language first, then a tab per other language", () => {
+    const { tabs, panels, loadLanguage } = renderWithLanguages();
+    expect(tabs.map((t) => t.textContent)).toEqual(["English", "Spanish"]);
+    expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false"]);
+    expect(panels[0]?.querySelector(".lh-entry h3")?.textContent).toContain("manger");
+    expect(loadLanguage).not.toHaveBeenCalled();
+  });
+
+  it("translates the text into another language when its tab is chosen, without remembering the choice", async () => {
+    const { tabs, panels, loadLanguage, onChooseLanguage, release } = renderWithLanguages();
+    tabs[1]!.click();
+    expect(loadLanguage).toHaveBeenCalledWith("es");
+    release({ ok: true, result: spanish });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(panels[1]?.textContent).toContain("comer");
+    expect(onChooseLanguage).not.toHaveBeenCalled();
+
+    tabs[0]!.click();
+    expect(panels[0]?.querySelector(".lh-entry h3")?.textContent).toContain("manger");
+  });
+
+  it("keeps one footer, crediting what the loaded tabs show", async () => {
+    const { root, tabs, release } = renderWithLanguages();
+    expect(root.querySelectorAll("footer")).toHaveLength(1);
+    expect(root.querySelector("footer")?.textContent).not.toContain("MyMemory");
+    tabs[1]!.click();
+    release({ ok: true, result: spanish });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(root.querySelector("footer")?.textContent).toContain("MyMemory");
+  });
+
+  it("needs no tabs when there are no other languages", () => {
+    const { root } = renderWithLanguages({ languages: [] });
+    expect(root.querySelector("[role=tablist]")).toBeNull();
   });
 });
 
@@ -451,6 +511,56 @@ describe("renderResult: listening", () => {
     const { root, onListen } = renderFirstLanguage({ lang: "fr", senses: [], lead: "manger", entry: manger });
     listenButton(root)!.click();
     expect(onListen).toHaveBeenCalledWith(expect.objectContaining({ text: "manger", lang: "fr", recording: manger.audioUrl }));
+  });
+
+  const sayButton = (root: HTMLElement, text: string) =>
+    root.querySelector<HTMLButtonElement>(`button.lh-say[aria-label="Listen to “${text}”"]`);
+
+  it("says every translation, not only the main one", () => {
+    const manger = parseKaikki(fixture("french-manger")).find((e) => e.pos === "verb")!;
+    const { root, onListen } = renderFirstLanguage({
+      lang: "fr",
+      senses: [{ pos: "verb", sense: "to ingest", words: [{ word: "manger", tags: [] }, { word: "bouffer", tags: ["slang"] }] }],
+      lead: "manger",
+      entry: manger,
+    }, { speechLanguages: new Set(["fr"]) });
+    sayButton(root, "bouffer")!.click();
+    expect(onListen).toHaveBeenLastCalledWith({ text: "bouffer", lang: "fr" });
+    sayButton(root, "manger")!.click();
+    expect(onListen).toHaveBeenLastCalledWith(expect.objectContaining({ text: "manger", recording: manger.audioUrl }));
+  });
+
+  it("says each gender and number of an adjective", () => {
+    const beau = parseKaikki(fixture("french-beau")).find((e) => e.pos === "adj")!;
+    const { root, onListen } = renderFirstLanguage({ lang: "fr", senses: [], lead: "beau", entry: beau }, { speechLanguages: new Set(["fr"]) });
+    for (const form of ["belle", "beaux", "belles"]) {
+      sayButton(root, form)!.click();
+      expect(onListen).toHaveBeenLastCalledWith({ text: form, lang: "fr" });
+    }
+    expect(root.querySelector(".lh-entry h4")?.textContent).toContain("select a form to hear it");
+  });
+
+  it("says a conjugated form with its pronoun, announcing in the entry", async () => {
+    const onListen = vi.fn(async (_: Speech): Promise<Spoken> => "voice");
+    const root = render(explainResult({}), { speechLanguages: new Set(["fr"]) }, onListen);
+    sayButton(root, "nous mangeons")!.click();
+    expect(onListen).toHaveBeenCalledWith({ text: "nous mangeons", lang: "fr" });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(root.querySelector(".lh-entry .lh-listen-status")?.textContent).toBe("Reading it with your computer's voice.");
+  });
+
+  it("keeps forms as plain text when there's no voice, except the word Wiktionary has a recording of", () => {
+    const root = render(explainResult({}));
+    const labels = [...root.querySelectorAll("button.lh-say")].map((b) => b.getAttribute("aria-label"));
+    expect(labels.length).toBeGreaterThan(0);
+    expect(new Set(labels)).toEqual(new Set(["Listen to “manger”"]));
+    expect(root.querySelector(".lh-entry h4")?.textContent).not.toContain("hear");
+  });
+
+  it("reads the first of several pronouns, and joins an elided one", () => {
+    expect(cellSpeech("il/elle", "mange")).toBe("il mange");
+    expect(cellSpeech("j’", "aime")).toBe("j’aime");
+    expect(cellSpeech(undefined, "belle")).toBe("belle");
   });
 
   it("says a phrase's machine translation in the language being learned", () => {

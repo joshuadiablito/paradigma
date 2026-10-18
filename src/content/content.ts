@@ -1,3 +1,4 @@
+import { normaliseLanguageTag } from "../shared/languages";
 import { saveLastLanguage } from "../shared/last-language";
 import type {
   ContentMessage,
@@ -13,11 +14,17 @@ import type {
 } from "../shared/messages";
 import { loadSettings, onSettingsChanged, type Settings } from "../shared/settings";
 import type { LookupResult } from "../shared/types";
-import { resolvePageLanguage, resolveTextLanguage, type PageLanguage } from "./activation";
+import { isTranslatable } from "../shared/word";
+import { activeLanguages, resolvePageLanguage, resolveTextLanguage, type PageLanguage } from "./activation";
 import { LookupPopup, type PopupActions } from "./popup-ui";
 import { currentSelection, type Selected } from "./selection";
 
 const DETECTION_SAMPLE_CHARS = 8000;
+/**
+ * Fewer words than this are too little to tell a selection's own language
+ * from, and are often names ("New York Times" on a Spanish page).
+ */
+const SELECTION_DETECTION_WORDS = 4;
 /** A recording or voice starts within a second or two; longer means something is stuck. */
 const LISTEN_TIMEOUT_MS = 8000;
 
@@ -65,6 +72,23 @@ function languageOf(element: Element): string | null {
   const marked = element.closest("[lang]");
   const elementLang = marked && marked !== document.documentElement ? marked.getAttribute("lang") : null;
   return resolveTextLanguage({ page, elementLang, htmlLang: htmlLang(), settings });
+}
+
+/**
+ * The language of selected text. A phrase is detected on its own, so that
+ * English quoted on a Spanish page is translated rather than explained as
+ * Spanish; a few words are too little to go on, so they take the page's.
+ * Chrome never calls so short a text reliable, but its guess usually is
+ * right, and when it isn't it tends to name a language not being learned
+ * ("la casa de mi madre" as Catalan), which is ignored.
+ */
+async function selectionLanguage(text: string, element: Element): Promise<string | null> {
+  const lang = languageOf(element);
+  if (lang === null || page.reason === "site-on") return lang;
+  if (text.trim().split(/\s+/).length < SELECTION_DETECTION_WORDS) return lang;
+  const { languages } = await chrome.i18n.detectLanguage(text).catch(() => ({ languages: [] }));
+  const own = normaliseLanguageTag(languages[0]?.language);
+  return own && activeLanguages(settings).includes(own) ? own : lang;
 }
 
 async function lookUp(selected: Selected, lang: string, opts: { focus: boolean }): Promise<void> {
@@ -123,30 +147,31 @@ function onMouseUp(e: MouseEvent): void {
   if (e.button !== 0 || popup.contains(e.target)) return;
   if (settings.trigger === "alt" && !e.altKey) return;
   // The selection is final only after the mouseup's default action has run.
-  setTimeout(() => {
+  setTimeout(async () => {
     const selected = currentSelection(document);
-    if (!selected) return;
-    const lang = languageOf(selected.element);
-    if (!lang || (popup.isOpen && popup.query === selected.text)) return;
+    if (!selected || !isTranslatable(selected.text)) return;
+    if (popup.isOpen && popup.query === selected.text) return;
+    const lang = await selectionLanguage(selected.text, selected.element);
+    if (!lang || currentSelection(document)?.text !== selected.text) return;
     void lookUp(selected, lang, { focus: false });
   }, 0);
 }
 
 /** Keyboard shortcut or context menu: look up the selection and move focus into the popup. */
-function lookUpSelection(contextMenuText?: string): void {
+async function lookUpSelection(contextMenuText?: string): Promise<void> {
   const selected = currentSelection(document);
   const text = (contextMenuText ?? selected?.text ?? "").trim();
-  if (!text) return;
+  if (!text || !isTranslatable(text)) return;
   const element = selected?.element ?? document.body;
   // The shortcut is an explicit request, so fall back to the page's language.
-  const lang = languageOf(element) ?? page.lang ?? settings.native;
+  const lang = (await selectionLanguage(text, element)) ?? page.lang ?? settings.native;
   const rect = selected?.rect ?? new DOMRect(16, 16, 0, 0);
   popup.pinned = false;
   void lookUp({ text, rect, element }, lang, { focus: true });
 }
 
 chrome.runtime.onMessage.addListener((message: ContentMessage, _sender, sendResponse) => {
-  if (message.type === "lookup-selection") lookUpSelection(message.text);
+  if (message.type === "lookup-selection") void lookUpSelection(message.text);
   if (message.type === "status") {
     sendResponse({ host, lang: page.lang, reason: page.reason } satisfies StatusResponse);
   }

@@ -116,17 +116,20 @@ export function createLookupService(fetchFn: typeof fetch = fetch, storage?: Sto
     /**
      * In the user's own language: translate into the languages being learned,
      * starting with the tab shown first. In a language being learned: explain
-     * it, with its forms, in the user's language.
+     * it, with its forms, in the user's language, followed by the other
+     * languages being learned, translated when their tab is shown.
      */
-    lookup(text: string, lang: string, context: LookupContext, lastChosen?: string): Promise<LookupResult> {
+    async lookup(text: string, lang: string, context: LookupContext, lastChosen?: string): Promise<LookupResult> {
       const { native, learning } = context;
       const query = text.trim();
       const fetchFn = fetchFor(context);
       if (lang === native) return translate({ text: query, from: native, targets: learning, lastChosen }, stepsWith(fetchFn));
       const key = `${lang}|${native}|${query}`;
-      return explanations.get(key, () =>
+      const explanation = await explanations.get(key, () =>
         savedOr(`explain:${key}`, isExplanation, (r) => r.warnings.length === 0, fetchFn,
           (fetchFn) => explain({ text: query, lang, target: native, fetchFn })));
+      const languages = learning.filter((l) => l !== lang && l !== native);
+      return { ...explanation, native, languages };
     },
 
     /** One language's translation of text in the user's language, for a tab chosen after the lookup. */

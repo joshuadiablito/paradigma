@@ -17,7 +17,7 @@ export type LookupResponse = { ok: true; result: LookupResult } | { ok: false; e
 export interface TranslateLanguageRequest {
   type: "translate-language";
   text: string;
-  /** Language of the text: the user's own, as in the lookup's result. */
+  /** Language of the text, as in the lookup's result: the user's own, or one being learned. */
   from: string;
   /** The language to translate into. */
   lang: string;
