@@ -4,6 +4,8 @@ import popupCss from "./popup.css?inline";
 import { renderResult, type RenderHandlers, type RenderOptions } from "./render";
 
 const GAP = 8;
+/** Shorter than this, the popup would be too cramped to use: it may cover the word instead. */
+const MIN_HEIGHT = 160;
 
 /** What the popup asks of its owner while a translation is shown. */
 export type PopupActions = Pick<RenderHandlers, "loadLanguage" | "onChooseLanguage" | "onListen">;
@@ -136,16 +138,31 @@ export class LookupPopup {
     });
   }
 
-  /** Below the word if it fits, else above; kept inside the viewport. */
+  /**
+   * Below the word if it fits, else above; if it fits neither, on the side
+   * with more room, shortened to fit there (it scrolls), so it doesn't cover
+   * the word. Kept inside the viewport.
+   */
   #position(): void {
     const a = this.#anchor;
     if (!a) return;
     const vw = this.#doc.documentElement.clientWidth;
     const vh = this.#doc.documentElement.clientHeight;
+    this.#dialog.style.maxHeight = "";
     const { width, height } = this.#dialog.getBoundingClientRect();
-    const below = a.bottom + GAP;
-    const above = a.top - GAP - height;
-    const top = below + height <= vh || above < GAP ? Math.min(below, Math.max(GAP, vh - height - GAP)) : above;
+    const roomBelow = vh - a.bottom - 2 * GAP;
+    const roomAbove = a.top - 2 * GAP;
+    let top: number;
+    if (height <= roomBelow) top = a.bottom + GAP;
+    else if (height <= roomAbove) top = a.top - GAP - height;
+    else if (Math.max(roomBelow, roomAbove) < MIN_HEIGHT) top = Math.max(GAP, vh - height - GAP);
+    else if (roomBelow >= roomAbove) {
+      this.#dialog.style.maxHeight = `${Math.max(0, roomBelow)}px`;
+      top = a.bottom + GAP;
+    } else {
+      this.#dialog.style.maxHeight = `${Math.max(0, roomAbove)}px`;
+      top = GAP;
+    }
     const left = Math.min(Math.max(GAP, a.left), Math.max(GAP, vw - width - GAP));
     this.#dialog.style.top = `${Math.round(top)}px`;
     this.#dialog.style.left = `${Math.round(left)}px`;

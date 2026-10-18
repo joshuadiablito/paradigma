@@ -19,6 +19,7 @@
     "test:watch": "vitest",
     "check": "bun run typecheck && bun run test && bun run build",
     "smoke": "bun scripts/smoke.ts",
+    "listing": "bun scripts/listing.ts",
     "icons": "bun scripts/icons.ts",
     "package": "bun scripts/package.ts"
   },

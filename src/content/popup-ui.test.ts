@@ -122,3 +122,35 @@ describe("LookupPopup", () => {
     expect(popup.contains(button)).toBe(false);
   });
 });
+
+describe("LookupPopup: placement", () => {
+  /** Opens the popup for a word at `word` in an 800px-high window, the popup being `height` tall. */
+  function place(word: DOMRect, height: number) {
+    document.body.replaceChildren();
+    Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: 800 });
+    Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: 1280 });
+    const popup = new LookupPopup(document);
+    const d = dialog(popup);
+    d.getBoundingClientRect = () => new DOMRect(0, 0, 420, d.style.maxHeight ? Math.min(height, parseFloat(d.style.maxHeight)) : height);
+    popup.showLoading("word", "fr", word, { focus: false });
+    return { top: parseFloat(d.style.top), maxHeight: d.style.maxHeight };
+  }
+
+  it("goes below the word when it fits", () => {
+    expect(place(new DOMRect(100, 100, 40, 20), 400)).toEqual({ top: 128, maxHeight: "" });
+  });
+
+  it("goes above the word when only that fits", () => {
+    expect(place(new DOMRect(100, 600, 40, 20), 400)).toEqual({ top: 192, maxHeight: "" });
+  });
+
+  it("shortens itself rather than cover the word when it fits on neither side", () => {
+    // Below the word mid-window: 800 - 320 - 16 = 464px of room.
+    const below = place(new DOMRect(100, 300, 40, 20), 560);
+    expect(below).toEqual({ top: 328, maxHeight: "464px" });
+    // Low in the window there's more room above: 500 - 16 = 484px.
+    const above = place(new DOMRect(100, 500, 40, 20), 560);
+    expect(above).toEqual({ top: 8, maxHeight: "484px" });
+    expect(above.top + 484).toBeLessThanOrEqual(500 - 8);
+  });
+});

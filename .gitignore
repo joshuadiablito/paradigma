@@ -3,4 +3,5 @@ dist/
 *.zip
 .DS_Store
 smoke-output/
+listing-output/
 .claude/worktrees/

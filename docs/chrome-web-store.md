@@ -30,17 +30,28 @@ Update the "Last updated" date in `PRIVACY.md` whenever what the extension
 sends or stores changes. Update the store's privacy answers (below) at the same
 time.
 
-### 3. Prepare the listing images
+### 3. Make the listing images
 
-| Asset              | Size                   | Source                                                          |
-| ------------------ | ---------------------- | --------------------------------------------------------------- |
-| Store icon         | 128 × 128 PNG          | `public/icons/icon-128.png`                                     |
-| Screenshots (1–5)  | 1280 × 800 PNG or JPEG | `bun run build && bun run smoke` writes them to `smoke-output/` |
-| Small promo tile   | 440 × 280 PNG or JPEG  | Not made yet; the dashboard shows whether it's required         |
+```sh
+bun run build && bun run listing
+```
 
-The smoke test's screenshots (English word in French and Spanish, an English
-phrase, French and Greek words) are the right size. They show the test page, so for a nicer listing,
-take screenshots on a real site at the same size.
+This loads the built extension into Chromium on demo pages (fictional sites,
+with text written for them), looks words up against the real dictionary and
+translation services, and writes the images to `listing-output/`
+(gitignored):
+
+| Asset             | Size        | File                                        |
+| ----------------- | ----------- | ------------------------------------------- |
+| Store icon        | 128 × 128   | `public/icons/icon-128.png`                 |
+| Screenshots       | 1280 × 800  | `1-translate.jpg` … `5-settings.jpg`        |
+| Small promo tile  | 440 × 280   | `promo-small-440x280.jpg`                   |
+| Marquee promo     | 1400 × 560  | `promo-marquee-1400x560.jpg` (optional)     |
+
+They're JPEGs without transparency, which the store requires of promo
+images. Upload the screenshots in order: the first is the one most people see.
+Rerun the script after changing how the popup looks, so the listing matches
+what users get. Captions and demo pages are in `scripts/listing.ts`.
 
 ## Releasing a version
 
