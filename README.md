@@ -34,7 +34,7 @@ you're learning, one tab each:
 Nothing happens until you select something, so ordinary reading and
 hovering aren't interrupted.
 
-![Selecting "eat" on an English page shows French, Greek and Spanish tabs](docs/images/translate.png)
+![Selecting "eat" on an English page shows French, Spanish and Greek tabs](docs/images/translate.jpg)
 
 ## Contents
 
