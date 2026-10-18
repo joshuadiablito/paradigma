@@ -127,16 +127,18 @@ git push origin v0.1.0
 > the main translation. Select a phrase to translate it into each language.
 >
 > On a page in a language you're learning, see what a word means in English
-> and every form it takes.
+> and every form it takes, with a tab for each other language you're learning.
 >
 > • Meanings with examples and pronunciation, from Wiktionary
-> • Hear it said: native speakers' recordings, or your computer's own voices
+> • Hear it said: native speakers' recordings, or your computer's own voices,
+>   for every translation and every form in the tables
 > • Which form you're looking at: "mange is the present tense of manger"
 > • Full conjugation tables by person and number, with pronouns
 > • Adjectives by gender, number and case; nouns by number and case
 > • Spanish tables for Spain, Latin America or Río de la Plata (vos)
 > • Greek tenses named by aspect: present, aorist, dependent, futures
 > • Nothing happens until you select something; turn it off per site
+> • Web addresses, emails and phone numbers are left alone
 > • Keyboard shortcut, and usable with a screen reader
 >
 > 24 languages, including French, Spanish, German, Italian, Portuguese, Greek, Māori,
@@ -164,8 +166,8 @@ git push origin v0.1.0
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `storage`                            | Saves the user's settings: the languages they're learning, translation language, how lookups are triggered, per-site on/off rules, and an optional email address for MyMemory's higher limit. Also keeps recent lookups' results on the device for up to 30 days, so repeating a lookup doesn't repeat its requests. |
 | `contextMenus`                       | Adds "Look up …" to the right-click menu for selected text, for touch screens and for when automatic lookups are set to need Alt.                                                                              |
-| `tts`                                | Reads a looked-up word or phrase aloud when the user presses Listen, using only the computer's on-device voices.                                                                                              |
-| `offscreen`                          | Plays a native speaker's pronunciation recording from Wikimedia when the user presses Listen. Playing it from an extension page means a website's security policy can't block it.                            |
+| `tts`                                | Reads a looked-up word or phrase, or one of its forms, aloud when the user presses Listen or clicks it, using only the computer's on-device voices.                                                                                              |
+| `offscreen`                          | Plays a native speaker's pronunciation recording from Wikimedia when the user presses Listen or clicks the word. Playing it from an extension page means a website's security policy can't block it.                            |
 | Host `https://kaikki.org/*`          | Fetches the dictionary entry (meanings, pronunciation and inflection tables) for the word the user looks up.                                                                                                   |
 | Host `https://api.mymemory.translated.net/*` | Fetches a translation of the word or phrase the user looks up.                                                                                                                                        |
 | Content script on `http://*/*`, `https://*/*` | Language learners read any site, so the extension must be able to see what the user selects and show its popup on any page. It does nothing until the user selects text, and sends nothing but the selected text. |

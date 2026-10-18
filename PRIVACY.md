@@ -1,6 +1,6 @@
 # Paradigma privacy policy
 
-_Last updated: 1 October 2026_
+_Last updated: 18 October 2026_
 
 Paradigma helps you learn languages by showing the meaning and forms of
 words on web pages. This policy explains what data it handles.
@@ -33,8 +33,9 @@ context menu), **the selected text** and **its language** are sent to:
 - **MyMemory** (api.mymemory.translated.net), which provides machine
   translation. It receives the text, up to 500 bytes, and the language pair
   (when translating from your own language, one request per language whose
-  tab you open). A word in a language you're learning is only sent here if
-  the dictionary doesn't explain it. MyMemory also receives your email
+  tab you open). A word in a language you're learning is sent here if the
+  dictionary doesn't explain it, and when you open the tab of another language
+  you're learning, to translate it into that one. MyMemory also receives your email
   address if you've chosen to give one (see below).
   See [MyMemory's privacy policy](https://mymemory.translated.net/doc/privacy.php).
 
@@ -56,7 +57,7 @@ in the extension needs it.
 - To remove it, clear the field on the settings page. It's then deleted from
   your settings and no longer sent.
 
-When you press **Listen**:
+When you press **Listen**, or click a word or form to hear it:
 
 - If Wiktionary has a native speaker's recording of the word, it's loaded from
   Wikimedia (upload.wikimedia.org), which receives only the request for that
