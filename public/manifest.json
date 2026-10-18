@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Paradigma",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Select a word to see it in the languages you're learning, with every conjugation and declension, or to see what it means.",
   "homepage_url": "https://github.com/joshuadiablito/paradigma",
   "minimum_chrome_version": "128",

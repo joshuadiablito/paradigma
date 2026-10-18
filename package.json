@@ -1,6 +1,6 @@
 {
   "name": "paradigma",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Chrome extension: select a word to see it in the languages you're learning, with every conjugation and declension, or to see what it means.",
