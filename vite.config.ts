@@ -13,6 +13,8 @@ export default defineConfig(({ mode }) => ({
     emptyOutDir: false,
     sourcemap: mode === "development" ? "inline" : false,
     minify: mode !== "development",
+    // Extension pages only run in Chrome, which supports modulepreload natively.
+    modulePreload: { polyfill: false },
     rollupOptions: {
       input: {
         options: resolve(import.meta.dirname, "src/options/options.html"),

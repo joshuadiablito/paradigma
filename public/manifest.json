@@ -3,6 +3,7 @@
   "name": "Paradigma",
   "version": "0.1.0",
   "description": "Select a word to see it in the languages you're learning, with every conjugation and declension, or to see what it means.",
+  "homepage_url": "https://github.com/joshuadiablito/paradigma",
   "minimum_chrome_version": "128",
   "permissions": ["storage", "contextMenus", "tts", "offscreen"],
   "host_permissions": ["https://kaikki.org/*", "https://api.mymemory.translated.net/*"],

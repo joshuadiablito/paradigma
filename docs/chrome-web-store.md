@@ -15,17 +15,16 @@ dashboard and update this page.
 4. Under **Account**, set the **contact email** and verify it. It's shown
    publicly on the listing, and the privacy policy points users to it.
 
-### 2. Put the privacy policy at a public URL
+### 2. The privacy policy URL
 
 The store needs a privacy policy URL, because the extension sends looked-up text
-to kaikki.org and MyMemory. The policy is [PRIVACY.md](../PRIVACY.md), but
-**this repository is private**, so its GitHub link won't work for reviewers.
-Do one of the following:
+to kaikki.org and MyMemory. The policy is [PRIVACY.md](../PRIVACY.md), and the
+repository is public, so use:
 
-- Make the repository public. The URL is then
-  `https://github.com/joshuadiablito/paradigma/blob/main/PRIVACY.md`.
-- Or publish the contents of `PRIVACY.md` somewhere public, such as a public
-  gist or your own site, and use that URL.
+`https://github.com/joshuadiablito/paradigma/blob/main/PRIVACY.md`
+
+It always shows the latest version on `main`, so push any change to the
+policy before submitting the version it describes.
 
 Update the "Last updated" date in `PRIVACY.md` whenever what the extension
 sends or stores changes. Update the store's privacy answers (below) at the same
@@ -75,8 +74,11 @@ bun run package
 ```
 
 This checks that the two versions match, runs `bun run check` (typecheck,
-tests, production build), and writes `paradigma-<version>.zip` with
-`manifest.json` at its root. The zip is gitignored.
+tests, production build), checks that the build holds only what the
+extension runs (no source maps, sources, docs or tests), and writes
+`paradigma-<version>.zip` with `manifest.json` at its root. The zip is
+gitignored. Only `dist/` is packaged; the repository's docs, tests and
+fixtures never go into it.
 
 ### 4. Upload
 
@@ -104,9 +106,13 @@ permissions casually.
 
 ### 5. Tag the release
 
+Once it's submitted, tag the commit that was packaged and publish a GitHub
+release, so the public repository shows what each store version contains:
+
 ```sh
 git tag v0.1.0
 git push origin v0.1.0
+gh release create v0.1.0 --title "Paradigma 0.1.0" --notes "What changed for users."
 ```
 
 ## Listing answers
@@ -117,6 +123,8 @@ git push origin v0.1.0
 | Summary     | From the manifest's `description` (132 characters at most)                                                             |
 | Category    | Education                                                                                                              |
 | Language    | English                                                                                                                |
+| Homepage URL | `https://github.com/joshuadiablito/paradigma`                                                                         |
+| Support URL | `https://github.com/joshuadiablito/paradigma/issues`                                                                   |
 
 **Description** (edit as you like):
 

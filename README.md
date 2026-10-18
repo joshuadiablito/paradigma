@@ -27,7 +27,9 @@ you're learning, one tab each:
 - **all its other forms**:
   - every tense of a verb, by person and number, with subject pronouns;
   - an adjective by gender and number (German and Greek: by case too);
-  - a noun by number and case.
+  - a noun by number and case;
+- **the other languages you're learning**, a tab each after your own: a
+  Spanish word translated into French and Greek too.
 
 Nothing happens until you select something, so ordinary reading and
 hovering aren't interrupted.
@@ -44,6 +46,7 @@ hovering aren't interrupted.
 - [Releasing to the Chrome Web Store](#releasing-to-the-chrome-web-store)
 - [Privacy](#privacy)
 - [Known limitations](#known-limitations)
+- [Feedback](#feedback)
 
 ## Using it
 
@@ -136,7 +139,7 @@ for each one.
 ### Install and load the extension
 
 ```sh
-git clone git@github.com:joshuadiablito/paradigma.git
+git clone https://github.com/joshuadiablito/paradigma.git
 cd paradigma
 bun install
 bun run build
@@ -323,12 +326,18 @@ Details are in **[PRIVACY.md](PRIVACY.md)**.
 
 - Compound tenses (_passé composé_ and similar) are not shown; Wiktionary lists them only as "avoir + past participle".
 - Definitions are always in English, because they come from English Wiktionary. Your chosen language applies to translations only.
-- Single-word machine translation is often wrong, so a word in a language you're learning is only machine-translated when the dictionary doesn't explain it, and then it's labelled as machine translation.
+- Single-word machine translation is often wrong, so a word in a language you're learning is only machine-translated into your language when the dictionary doesn't explain it, and then it's labelled as machine translation. Its tabs for your other learning languages start from a machine translation (only English Wiktionary has translation tables), checked against those languages' dictionaries where it can be.
 - A word split across elements (`<b>ma</b>nger`) is not detected.
 - Wiktionary has native speakers' recordings mostly for French; other languages are read by your computer's voices. There's no Listen button for a language your computer has no voice for (on a Mac, Māori), since only on-device voices are used, to keep the text private.
 - On touch screens, select the text and use the context menu or the keyboard shortcut; the automatic lookup follows a mouse selection.
 - Translating an English word that has several meanings shows the forms of the most common translation (Wiktionary's, with MyMemory breaking ties); the other meanings' translations are listed above it.
 - Wiktionary's coverage varies by language. Common Greek words have full tables, but rarer ones may have no translation or a stub entry. The popup then shows a machine translation and says that no table is available, rather than guessing.
+
+## Feedback
+
+Found a word that comes out wrong, or a site where Paradigma misbehaves?
+[Open an issue](https://github.com/joshuadiablito/paradigma/issues) with the
+word, its language and, if you can, the page.
 
 ## Licence
 

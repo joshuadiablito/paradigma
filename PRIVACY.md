@@ -97,4 +97,5 @@ When you press **Listen**, or click a word or form to hear it:
 ## Contact
 
 Questions: use the developer contact email on the extension's Chrome Web
-Store listing.
+Store listing, or [open an issue](https://github.com/joshuadiablito/paradigma/issues)
+on GitHub. Issues are public, so don't include anything private in one.

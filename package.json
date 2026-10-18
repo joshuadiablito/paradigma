@@ -5,6 +5,8 @@
   "type": "module",
   "description": "Chrome extension: select a word to see it in the languages you're learning, with every conjugation and declension, or to see what it means.",
   "license": "MIT",
+  "homepage": "https://github.com/joshuadiablito/paradigma",
+  "bugs": "https://github.com/joshuadiablito/paradigma/issues",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/joshuadiablito/paradigma.git"
